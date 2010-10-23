@@ -13,6 +13,7 @@ type sop =
 
 type static_exp =
   | SConst of int
+  | SVar of name
   | SBinOp of sop * static_exp * static_exp
 
 type prim =

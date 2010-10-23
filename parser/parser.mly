@@ -69,6 +69,7 @@ pat:
 
 static_exp :
   | i=INT { SConst i }
+  | n=NAME { SVar n }
   | se1=static_exp POWER se2=static_exp { SBinOp(SPower, se1, se2) }
   | se1=static_exp PLUS se2=static_exp { SBinOp(SAdd, se1, se2) }
   | se1=static_exp MINUS se2=static_exp { SBinOp(SMinus, se1, se2) }
@@ -82,6 +83,8 @@ _exp:
   | LPAREN e=_exp RPAREN      { e }
   | c=const                   { Econst c }
   | op=op a=exps              { Eapp(op, a) }
+  | e1=exp op=infix_prim e2=exp { Eapp(OPrim op, [e1; e2])}
+  | op=prefix_prim a=exps     { Eapp(OPrim op, a)}
 
 const:
   | b=BOOL { VBit b }
@@ -90,19 +93,20 @@ rom_or_ram :
   | ROM { true }
   | RAM { false }
 
-prim:
-  | MUX { PMux }
+infix_prim:
   | OR { POr }
   | AND { PAnd }
   | XOR { PXor }
   | NAND { PNand }
+
+prefix_prim:
   | NOT { PNot }
+  | MUX { PMux }
 
 op:
   | REG { OReg }
   | ro=rom_or_ram LESS addr_size=INT COMMA word_size=INT GREATER
     { OMem(ro, addr_size, word_size) }
-  | p=prim { OPrim p }
   | n=NAME { OCall n }
 
 %%
