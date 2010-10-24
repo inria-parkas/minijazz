@@ -53,11 +53,11 @@ let compile_impl filename =
     close_in ic
   in
   try
+    let pp = Printer.print_program stdout in
     (* Parsing of the file *)
-    let p = do_silent_pass "Parsing" parse lexbuf in
+    let p = do_pass "Parsing" parse lexbuf pp in
 
-    (* Print *)
-    Printer.print_program stdout p;
+    let p = pass "Scoping" true Scoping.program p pp in
 
     close_all_files ()
   with

@@ -4,9 +4,8 @@ type ident = string
 type name = string
 type function_name = string
 
-type ty =
-  | TBit | TBitArray of int
-let invalid_type = TBitArray (-1)
+module NameEnv = Map.Make (struct type t = name let compare = compare end)
+module IdentEnv = Map.Make (struct type t = ident let compare = compare end)
 
 type sop =
   | SAdd | SMinus | SMult | SDiv | SPower
@@ -15,6 +14,10 @@ type static_exp =
   | SConst of int
   | SVar of name
   | SBinOp of sop * static_exp * static_exp
+
+type ty =
+  | TUnit | TBit | TBitArray of static_exp
+let invalid_type = TUnit
 
 type prim =
   | PNot
@@ -94,3 +97,4 @@ let mk_node n loc inputs outputs eqs =
 
 let mk_program cds nds =
   { p_consts = cds; p_nodes = nds }
+

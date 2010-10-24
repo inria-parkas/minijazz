@@ -38,6 +38,11 @@ let rec print_static_exp ff se = match se with
       | SPower -> "^" in
       fprintf ff "(%a %s %a)" print_static_exp se1  op_str  print_static_exp se2
 
+let print_type ff ty = match ty with
+  | TUnit -> fprintf ff "()"
+  | TBit -> fprintf ff "bit"
+  | TBitArray se -> fprintf ff "bit[%a]" print_static_exp se
+
 let print_op ff op = match op with
   | OReg -> fprintf ff "reg"
   | OMem(true, addr_size, word_size) -> (*ROM*)
@@ -89,8 +94,9 @@ let print_eqs ff eqs =
   print_list_nlr print_eq """;""" ff eqs
 
 let print_var_dec ff vd = match vd.v_ty with
-  | TBit -> fprintf ff "%a" print_name vd.v_ident
-  | TBitArray i -> fprintf ff "%a : [%d]" print_name vd.v_ident  i
+  | TUnit | TBit -> fprintf ff "%a" print_name vd.v_ident
+  | TBitArray se ->
+    fprintf ff "%a : [%a]" print_name vd.v_ident  print_static_exp se
 
 let print_var_decs ff vds =
   print_list_r print_var_dec "("","")" ff vds

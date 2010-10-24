@@ -46,7 +46,7 @@ const_dec:
 
 name: n=NAME { n }
 
-type_ident: LBRACKET i=INT RBRACKET { TBitArray i }
+type_ident: LBRACKET se=static_exp RBRACKET { TBitArray se }
 
 node_decs: ns=list(node_dec) {ns}
 node_dec:
