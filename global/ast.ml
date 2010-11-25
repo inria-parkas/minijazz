@@ -1,37 +1,22 @@
 open Location
+open Static
 
 type ident = string
-type name = string
 type function_name = string
 
-module NameEnv = Map.Make (struct type t = name let compare = compare end)
 module IdentEnv = Map.Make (struct type t = ident let compare = compare end)
 
-type sop =
-  | SAdd | SMinus | SMult | SDiv | SPower
-
-type static_exp =
-  | SConst of int
-  | SVar of name
-  | SBinOp of sop * static_exp * static_exp
-
 type ty =
-  | TUnit | TBit | TBitArray of static_exp
+  | TUnit | TBit | TBitArray of static_exp | TProd of ty list
 let invalid_type = TUnit
-
-type prim =
-  | PNot
-  | PAnd
-  | POr
-  | PXor
-  | PNand
-  | PMux
 
 type op =
   | OReg
-  | OPrim of prim
   | OMem of bool * int * int (* read_only * address size * word size *)
-  | OCall of function_name
+  | OCall of function_name * static_exp list (*function, params*)
+  | OSelect of static_exp
+  | OSlice of static_exp * static_exp
+  | OConcat
 
 type value =
   | VBit of bool
@@ -59,13 +44,22 @@ type var_dec = {
   v_ty : ty;
 }
 
+type param = {
+  p_name : name;
+}
+
+type block =
+    | BEqs of equation list
+    | BIf of static_exp * block * block
+
 type node_dec = {
   n_name : name;
   n_loc: location;
   n_inputs : var_dec list;
   n_outputs : var_dec list;
   n_locals : var_dec list;
-  n_eqs : equation list;
+  n_params : param list;
+  n_body : block;
 }
 
 type const_dec = {
@@ -91,10 +85,16 @@ let mk_equation pat e = (pat, e)
 let mk_var_dec n ty =
   { v_ident = n; v_ty = ty }
 
-let mk_node n loc inputs outputs eqs =
-  { n_name = n; n_inputs = inputs; n_outputs = outputs; n_eqs = eqs;
+let mk_param n =
+  { p_name = n }
+
+let mk_node n loc inputs outputs params b =
+  { n_name = n; n_inputs = inputs; n_outputs = outputs;
+    n_body = b; n_params = params;
     n_loc = loc; n_locals = [] }
 
 let mk_program cds nds =
   { p_consts = cds; p_nodes = nds }
 
+
+let unifty t1 t2 = (t1 = t2)

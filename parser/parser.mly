@@ -1,5 +1,6 @@
 %{
 
+open Static
 open Ast
 open Location
 
@@ -8,6 +9,7 @@ open Location
 %token NODE ROM RAM WHERE CONST
 %token LPAREN RPAREN MUX COLON COMMA EQUAL REG OR XOR NAND AND POWER SLASH
 %token EOF RBRACKET LBRACKET GREATER LESS NOT SEMICOL PLUS MINUS STAR
+%token DOUBLE_LESS DOUBLE_GREATER IF THEN ELSE LEQ DOT DOTDOT
 %token <string> NAME
 %token <int> INT
 %token <bool> BOOL
@@ -50,9 +52,16 @@ type_ident: LBRACKET se=static_exp RBRACKET { TBitArray se }
 
 node_decs: ns=list(node_dec) {ns}
 node_dec:
-  NODE n=name LPAREN args=args RPAREN
-  EQUAL LPAREN out=args RPAREN WHERE eqs=equs
-      { mk_node n (Loc ($startpos,$endpos)) args out eqs }
+  NODE n=name p=params LPAREN args=args RPAREN
+  EQUAL LPAREN out=args RPAREN WHERE b=block
+      { mk_node n (Loc ($startpos,$endpos)) args out p b }
+
+params:
+  | /*empty*/ { [] }
+  | DOUBLE_LESS pl=snlist(COMMA,param) DOUBLE_GREATER { pl }
+
+param:
+  n=NAME { mk_param n }
 
 args: vl=slist(COMMA, arg) { vl }
 
@@ -60,20 +69,29 @@ arg:
   | n=NAME COLON t=type_ident { mk_var_dec n t }
   | n=NAME { mk_var_dec n TBit }
 
+block:
+  | eqs=equs { BEqs eqs }
+  | IF se=static_exp THEN thenb=block ELSE elseb=block { BIf(se, thenb, elseb) }
+
 equs: e=slist(SEMICOL, equ) { e }
 equ: p=pat EQUAL e=exp { mk_equation p e }
 
 pat:
-  | n=NAME                             { Evarpat n }
+  | n=NAME                              { Evarpat n }
   | LPAREN p=snlist(COMMA, NAME) RPAREN { Etuplepat p }
 
 static_exp :
-  | i=INT { SConst i }
+  | i=INT { SInt i }
   | n=NAME { SVar n }
+  /*integer ops*/
   | se1=static_exp POWER se2=static_exp { SBinOp(SPower, se1, se2) }
   | se1=static_exp PLUS se2=static_exp { SBinOp(SAdd, se1, se2) }
   | se1=static_exp MINUS se2=static_exp { SBinOp(SMinus, se1, se2) }
   | se1=static_exp STAR se2=static_exp { SBinOp(SMult, se1, se2) }
+  | se1=static_exp SLASH se2=static_exp { SBinOp(SDiv, se1, se2) }
+  /*bool ops*/
+  | se1=static_exp EQUAL se2=static_exp { SBinOp(SEqual, se1, se2) }
+  | se1=static_exp LEQ se2=static_exp { SBinOp(SLeq, se1, se2) }
 
 exps: LPAREN e=slist(COMMA, exp) RPAREN {e}
 
@@ -83,8 +101,12 @@ _exp:
   | LPAREN e=_exp RPAREN      { e }
   | c=const                   { Econst c }
   | op=op a=exps              { Eapp(op, a) }
-  | e1=exp op=infix_prim e2=exp { Eapp(OPrim op, [e1; e2])}
-  | op=prefix_prim a=exps     { Eapp(OPrim op, a)}
+  | e1=exp op=infix_prim e2=exp { Eapp(OCall (op, []), [e1; e2])}
+  | op=prefix_prim a=exps     { Eapp(OCall (op, []), a)}
+  | e1=exp DOT e2=exp               { Eapp(OConcat, [e1; e2]) }
+  | e1=exp LBRACKET idx=static_exp RBRACKET { Eapp(OSelect idx, [e1]) }
+  | e1=exp LBRACKET low=static_exp DOTDOT high=static_exp RBRACKET
+    { Eapp(OSlice(low, high), [e1]) }
 
 const:
   | b=BOOL { VBit b }
@@ -94,19 +116,23 @@ rom_or_ram :
   | RAM { false }
 
 infix_prim:
-  | OR { POr }
-  | AND { PAnd }
-  | XOR { PXor }
-  | NAND { PNand }
+  | OR { "or" }
+  | AND { "and" }
+  | XOR { "xor" }
+  | NAND { "nand" }
 
 prefix_prim:
-  | NOT { PNot }
-  | MUX { PMux }
+  | NOT { "not" }
+  | MUX { "mux" }
 
 op:
   | REG { OReg }
   | ro=rom_or_ram LESS addr_size=INT COMMA word_size=INT GREATER
     { OMem(ro, addr_size, word_size) }
-  | n=NAME { OCall n }
+  | n=NAME p=call_params { OCall (n,p) }
+
+call_params:
+  | /*empty*/ { [] }
+  | DOUBLE_LESS pl=snlist(COMMA,static_exp) DOUBLE_GREATER { pl }
 
 %%

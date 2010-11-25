@@ -57,7 +57,7 @@ let compile_impl filename =
     (* Parsing of the file *)
     let p = do_pass "Parsing" parse lexbuf pp in
 
-    let p = pass "Scoping" true Scoping.program p pp in
+   (* let p = pass "Scoping" true Scoping.program p pp in  *)
 
     close_all_files ()
   with

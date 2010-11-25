@@ -28,6 +28,9 @@ List.iter (fun (str,tok) -> Hashtbl.add keyword_table str tok) [
  "nand", NAND;
  "xor", XOR;
  "mux", MUX;
+ "if", IF;
+ "then", THEN;
+ "else", ELSE
 ]
 
 
@@ -102,16 +105,21 @@ rule token = parse
   | ","             { COMMA }
   | "-"             { MINUS }
   | "^"             { POWER }
+  | "<<"            { DOUBLE_LESS }
+  | ">>"            { DOUBLE_GREATER }
+  | "<="            { LEQ }
+  | "."             { DOT }
+  | ".."            { DOTDOT }
   | (['A'-'Z']('_' ? ['A'-'Z' 'a'-'z' ''' '0'-'9']) * as id)
       {NAME id}
   | (['A'-'Z' 'a'-'z']('_' ? ['A'-'Z' 'a'-'z' ''' '0'-'9']) * as id)
       { let s = Lexing.lexeme lexbuf in
         try Hashtbl.find keyword_table s
         with Not_found -> NAME id }
-  | '-'? ['0'-'9']+
-  | '-'? '0' ['x' 'X'] ['0'-'9' 'A'-'F' 'a'-'f']+
-  | '-'? '0' ['o' 'O'] ['0'-'7']+
-  | '-'? '0' ['b' 'B'] ['0'-'1']+
+  | ['0'-'9']+
+  | '0' ['x' 'X'] ['0'-'9' 'A'-'F' 'a'-'f']+
+  | '0' ['o' 'O'] ['0'-'7']+
+  | '0' ['b' 'B'] ['0'-'1']+
       { INT (int_of_string(Lexing.lexeme lexbuf)) }
   | "(*"
       { let comment_start = lexbuf.lex_curr_p in

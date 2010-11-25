@@ -1,5 +1,7 @@
 open Ast
+open Static
 open Format
+open Misc
 
 let print_name ff n = fprintf ff "%s" n
 let print_ident ff id = fprintf ff "%s" id
@@ -29,19 +31,27 @@ let rec print_const ff v = match v with
   | VBitArray l -> List.iter (print_bool ff) l
 
 let rec print_static_exp ff se = match se with
-  | SConst i -> fprintf ff "%d" i
+  | SInt i -> fprintf ff "%d" i
+  | SBool b -> print_bool ff b
   | SVar n -> print_name ff n
   | SBinOp(op, se1, se2) ->
     let op_str = match op with
       | SAdd -> "+" | SMinus -> "-"
       | SMult -> "*" | SDiv -> "/"
-      | SPower -> "^" in
+      | SPower -> "^" | SEqual -> "="
+      | SLess -> "<" | SLeq -> "<="
+      | SGreater -> ">" | SGeq -> ">=" in
       fprintf ff "(%a %s %a)" print_static_exp se1  op_str  print_static_exp se2
 
-let print_type ff ty = match ty with
+let rec print_type ff ty = match ty with
   | TUnit -> fprintf ff "()"
   | TBit -> fprintf ff "bit"
   | TBitArray se -> fprintf ff "bit[%a]" print_static_exp se
+  | TProd l ->  print_list_r print_type "" "*" "" ff l
+
+let print_call_params ff params = match params with
+  | [] -> ()
+  | _ -> print_list_r print_static_exp "<<"","">>" ff params
 
 let print_op ff op = match op with
   | OReg -> fprintf ff "reg"
@@ -49,8 +59,9 @@ let print_op ff op = match op with
     fprintf ff "rom<%d,%d>" addr_size word_size
   | OMem(false, addr_size, word_size) -> (*ROM*)
     fprintf ff "ram<%d,%d>" addr_size word_size
-  | OCall fn -> print_name ff fn
-  | OPrim _ -> assert false
+  | OCall (fn, params) ->
+      fprintf ff "%a%a"  print_name fn  print_call_params params
+  | OSelect _ | OSlice _ | OConcat _ -> assert false
 
 let rec print_exp ff e =
   (*if print_types then
@@ -61,13 +72,22 @@ let rec print_exp ff e =
 and print_edesc ff ed = match ed with
   | Econst v -> print_const ff v
   | Evar n -> print_ident ff n
-  | Eapp(OPrim op, args) -> print_prim ff op args
+  | Eapp(OSelect idx, args) ->
+      let e1 = assert_1 args in
+        fprintf ff "%a[%a]" print_exp e1  print_static_exp idx
+  | Eapp(OSlice(low, high), args) ->
+      let e1 = assert_1 args in
+        fprintf ff "%a[%a..%a]"
+          print_exp e1  print_static_exp low  print_static_exp high
+  | Eapp(OConcat, args) ->
+      let e1, e2 = assert_2 args in
+        fprintf ff "%a . %a" print_exp e1  print_exp e2
   | Eapp(op, args) -> fprintf ff "%a%a" print_op op  print_args args
 
 and print_args ff args =
   print_list_r print_exp "(" "," ")" ff args
 
-and print_prim ff prim args = match prim with
+(*and print_prim ff prim args = match prim with
   | PAnd | POr | PXor | PNand -> (*binary op*)
     let s = match prim with
       | PAnd -> "and"   | POr -> "or"
@@ -81,7 +101,7 @@ and print_prim ff prim args = match prim with
       | PMux -> "mux" | PNot -> "not"
       | _ -> assert false in
     let e1 = Misc.assert_1 args in
-      fprintf ff "%s(%a)" s  print_exp e1
+      fprintf ff "%s(%a)" s  print_exp e1*)
 
 let rec print_pat ff pat = match pat with
   | Evarpat id -> print_ident ff id
@@ -93,20 +113,37 @@ let print_eq ff (pat, e) =
 let print_eqs ff eqs =
   print_list_nlr print_eq """;""" ff eqs
 
+let rec print_block ff b = match b with
+  | BEqs eqs -> print_eqs ff eqs
+  | BIf(se, thenb, elseb) ->
+      fprintf ff "@[<v 2>if %a then@,%a@]@,@[<v 2>else@,%a@]"
+        print_static_exp se
+        print_block thenb
+        print_block elseb
+
 let print_var_dec ff vd = match vd.v_ty with
   | TUnit | TBit -> fprintf ff "%a" print_name vd.v_ident
   | TBitArray se ->
     fprintf ff "%a : [%a]" print_name vd.v_ident  print_static_exp se
+  | TProd _ -> assert false
 
 let print_var_decs ff vds =
   print_list_r print_var_dec "("","")" ff vds
 
+let print_param ff p =
+  print_name ff p.p_name
+
+let print_params ff params = match params with
+  | [] -> ()
+  | _ -> print_list_r print_param "<<"","">>" ff params
+
 let print_node ff n =
-  fprintf ff "@[<v2>@[node %a%a = %a@] where@ %a@]@\n@."
+  fprintf ff "@[<v2>@[node %a%a%a = %a@] where@ %a@]@\n@."
     print_name n.n_name
+    print_params n.n_params
     print_var_decs n.n_inputs
     print_var_decs n.n_outputs
-    print_eqs n.n_eqs
+    print_block n.n_body
 
 let print_const_dec ff cd =
   fprintf ff "const %a = %a@\n@."
