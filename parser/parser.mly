@@ -70,7 +70,7 @@ arg:
   | n=NAME { mk_var_dec n TBit }
 
 block:
-  | eqs=equs { BEqs eqs }
+  | eqs=equs { BEqs (eqs, []) }
   | IF se=static_exp THEN thenb=block ELSE elseb=block { BIf(se, thenb, elseb) }
 
 equs: e=slist(SEMICOL, equ) { e }
@@ -95,7 +95,7 @@ static_exp :
 
 exps: LPAREN e=slist(COMMA, exp) RPAREN {e}
 
-exp: e=_exp { mk_exp e (Loc ($startpos,$endpos)) }
+exp: e=_exp { mk_exp ~loc:(Loc ($startpos,$endpos)) e }
 _exp:
   | n=NAME                    { Evar n }
   | LPAREN e=_exp RPAREN      { e }
@@ -127,7 +127,7 @@ prefix_prim:
 
 op:
   | REG { OReg }
-  | ro=rom_or_ram LESS addr_size=INT COMMA word_size=INT GREATER
+  | ro=rom_or_ram LESS addr_size=static_exp COMMA word_size=static_exp GREATER
     { OMem(ro, addr_size, word_size) }
   | n=NAME p=call_params { OCall (n,p) }
 

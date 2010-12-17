@@ -56,9 +56,11 @@ let print_call_params ff params = match params with
 let print_op ff op = match op with
   | OReg -> fprintf ff "reg"
   | OMem(true, addr_size, word_size) -> (*ROM*)
-    fprintf ff "rom<%d,%d>" addr_size word_size
+    fprintf ff "rom<%a,%a>"
+      print_static_exp addr_size  print_static_exp word_size
   | OMem(false, addr_size, word_size) -> (*ROM*)
-    fprintf ff "ram<%d,%d>" addr_size word_size
+    fprintf ff "ram<%a,%a>"
+      print_static_exp addr_size  print_static_exp word_size
   | OCall (fn, params) ->
       fprintf ff "%a%a"  print_name fn  print_call_params params
   | OSelect _ | OSlice _ | OConcat _ -> assert false
@@ -114,7 +116,7 @@ let print_eqs ff eqs =
   print_list_nlr print_eq """;""" ff eqs
 
 let rec print_block ff b = match b with
-  | BEqs eqs -> print_eqs ff eqs
+  | BEqs (eqs, _) -> print_eqs ff eqs
   | BIf(se, thenb, elseb) ->
       fprintf ff "@[<v 2>if %a then@,%a@]@,@[<v 2>else@,%a@]"
         print_static_exp se

@@ -25,11 +25,11 @@ let fun_of_comp_op op = match op with
 let rec simplify env se = match se with
   | SInt _ | SBool _ -> se
   | SVar n ->
-    (try
-       simplify env (NameEnv.find n env)
-     with
-       | Not_found ->
-         Format.eprintf "The name '%s' is unbound@." n; raise Error)
+      (try
+          simplify env (NameEnv.find n env)
+        with
+          | Not_found ->
+              Format.printf "Unknwon static '%s'@." n; se)
   | SBinOp(op, se1, se2) ->
     (match op, simplify env se1, simplify env se2 with
       | (SAdd | SMinus | SDiv  | SMult), SInt i1, SInt i2 ->
@@ -39,9 +39,3 @@ let rec simplify env se = match se with
           let f = fun_of_comp_op op in
             SBool (f i1 i2)
       | _, _, _ -> SBinOp(op, se1, se2))
-
-let expect_const env se =
-  match simplify env se with
-    | SInt v -> SInt v
-    | _ -> Format.eprintf "Static instanciation failed@."; raise Error
-

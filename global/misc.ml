@@ -32,3 +32,13 @@ let unique l =
   let tbl = Hashtbl.create (List.length l) in
   List.iter (fun i -> Hashtbl.replace tbl i ()) l;
   Hashtbl.fold (fun key _ accu -> key :: accu) tbl []
+
+let is_empty = function | [] -> true | _ -> false
+
+let gen_symbol =
+  let counter = ref 0 in
+  let _gen_symbol () =
+    counter := !counter + 1;
+    "_"^(string_of_int !counter)
+  in
+    _gen_symbol

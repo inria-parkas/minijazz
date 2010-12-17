@@ -2,9 +2,13 @@ open Location
 open Static
 
 type ident = string
-type function_name = string
+type name = string
 
 module IdentEnv = Map.Make (struct type t = ident let compare = compare end)
+module IdentSet = Set.Make (struct type t = ident let compare = compare end)
+
+module NameEnv = Map.Make (struct type t = name let compare = compare end)
+module NameSet = Set.Make (struct type t = name let compare = compare end)
 
 type ty =
   | TUnit | TBit | TBitArray of static_exp | TProd of ty list
@@ -12,8 +16,8 @@ let invalid_type = TUnit
 
 type op =
   | OReg
-  | OMem of bool * int * int (* read_only * address size * word size *)
-  | OCall of function_name * static_exp list (*function, params*)
+  | OMem of bool * static_exp * static_exp (* ro * address size * word size *)
+  | OCall of name * static_exp list (*function, params*)
   | OSelect of static_exp
   | OSlice of static_exp * static_exp
   | OConcat
@@ -49,7 +53,7 @@ type param = {
 }
 
 type block =
-    | BEqs of equation list
+    | BEqs of equation list * var_dec list
     | BIf of static_exp * block * block
 
 type node_dec = {
@@ -57,7 +61,6 @@ type node_dec = {
   n_loc: location;
   n_inputs : var_dec list;
   n_outputs : var_dec list;
-  n_locals : var_dec list;
   n_params : param list;
   n_body : block;
 }
@@ -74,7 +77,7 @@ type program = {
 }
 
 
-let mk_exp desc loc =
+let mk_exp ?(loc = no_location) desc =
   { e_desc = desc; e_loc = loc; e_ty = invalid_type}
 
 let mk_const_dec ?(loc = no_location) n se =
@@ -91,7 +94,7 @@ let mk_param n =
 let mk_node n loc inputs outputs params b =
   { n_name = n; n_inputs = inputs; n_outputs = outputs;
     n_body = b; n_params = params;
-    n_loc = loc; n_locals = [] }
+    n_loc = loc }
 
 let mk_program cds nds =
   { p_consts = cds; p_nodes = nds }
