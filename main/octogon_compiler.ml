@@ -49,8 +49,11 @@ let lexbuf_from_file file_name =
 let compile_impl filename =
   (* input and output files *)
   let ic, lexbuf = lexbuf_from_file filename in
+  let oo_name = (Filename.chop_suffix filename ".ept") ^ ".oo" in
+  let oo = open_out oo_name in
   let close_all_files () =
-    close_in ic
+    close_in ic;
+    close_out oo
   in
   try
     let pp = Printer.print_program stdout in
@@ -60,6 +63,10 @@ let compile_impl filename =
     let p = pass "Scoping" true Scoping.program p pp in
 
     let p = pass "Callgraph" true Callgraph.program p pp in
+
+    let p = Oct2sim.program p in
+    (* Write the result of compilation to a binary file *)
+    output_value oo p;
 
     close_all_files ()
   with

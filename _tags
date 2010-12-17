@@ -1,4 +1,4 @@
 <**/*.ml>: debug, dtypes
 <**/*.{byte,native}>: use_unix, use_str, link_menhirLib, debug
-<global> or <parser> or <main> or <analysis>: include
+<global> or <parser> or <main> or <analysis> or <simulator>: include
 true: use_menhir
