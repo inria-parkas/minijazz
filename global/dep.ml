@@ -42,8 +42,11 @@ let mk_dependency_graph n =
         IdentEnv.find id env
     in
     let attach n1 n =
-      let n2 = IdentEnv.find n env in
-        add_depends n1 n2
+      try
+        let n2 = IdentEnv.find n env in
+          add_depends n1 n2
+      with
+        | Not_found -> () (*n is an input, no dependency*)
     in
     let node = node_for_eq env eq in
     let ids = read eq in

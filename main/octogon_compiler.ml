@@ -64,7 +64,7 @@ let compile_impl filename =
 
     let p = pass "Callgraph" true Callgraph.program p pp in
 
-    let p = silent_pass "Causality" true Causality.program p in
+    let p = pass "Causality" true Causality.program p pp in
 
     let p = Oct2sim.program p in
     (* Write the result of compilation to a binary file *)
