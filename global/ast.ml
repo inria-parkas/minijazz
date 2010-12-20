@@ -24,7 +24,7 @@ type op =
 
 type value =
   | VBit of bool
-  | VBitArray of bool list
+  | VBitArray of bool array
 
 type edesc =
   | Econst of value

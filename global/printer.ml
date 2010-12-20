@@ -28,7 +28,7 @@ let print_bool ff b =
 
 let rec print_const ff v = match v with
   | VBit b -> print_bool ff b
-  | VBitArray l -> List.iter (print_bool ff) l
+  | VBitArray l -> Array.iter (print_bool ff) l
 
 let rec print_static_exp ff se = match se with
   | SInt i -> fprintf ff "%d" i
