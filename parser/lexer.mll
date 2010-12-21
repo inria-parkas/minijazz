@@ -105,8 +105,6 @@ rule token = parse
   | ","             { COMMA }
   | "-"             { MINUS }
   | "^"             { POWER }
-  | "<<"            { DOUBLE_LESS }
-  | ">>"            { DOUBLE_GREATER }
   | "<="            { LEQ }
   | "."             { DOT }
   | ".."            { DOTDOT }
@@ -121,6 +119,13 @@ rule token = parse
   | '0' ['o' 'O'] ['0'-'7']+
   | '0' ['b' 'B'] ['0'-'1']+
       { INT (int_of_string(Lexing.lexeme lexbuf)) }
+  | "\""
+      { reset_string_buffer();
+        let string_start = lexbuf.lex_start_p in
+         (* string_start_loc := Location.curr lexbuf; *)
+          string lexbuf;
+          lexbuf.lex_start_p <- string_start;
+          STRING (get_stored_string()) }
   | "(*"
       { let comment_start = lexbuf.lex_curr_p in
         comment_depth := 1;

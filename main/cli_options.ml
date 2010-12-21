@@ -4,6 +4,8 @@ let version = "0.1"
 let verbose = ref false
 let print_types = ref false
 
+let base_path = ref ""
+
 let show_version () =
   Format.printf "The Octagon compiler, version %s @." version
 let errmsg = "Options are:"

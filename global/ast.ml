@@ -16,7 +16,8 @@ let invalid_type = TUnit
 
 type op =
   | OReg
-  | OMem of bool * static_exp * static_exp (* ro * address size * word size *)
+  | OMem of bool * static_exp * static_exp * string option
+      (* ro * address size * word size * input file *)
   | OCall of name * static_exp list (*function, params*)
   | OSelect of static_exp
   | OSlice of static_exp * static_exp

@@ -11,7 +11,7 @@ let comment ?(sep=separateur) s =
 let do_pass d f p pp =
   comment (d^" ...\n");
   let r = f p in
-  pp r;
+  if !verbose then pp r;
   comment ~sep:"*** " (d^" done.");
   r
 
@@ -56,6 +56,8 @@ let compile_impl filename =
     close_out oo
   in
   try
+    base_path := Filename.dirname filename;
+
     let pp = Printer.print_program stdout in
     (* Parsing of the file *)
     let p = do_pass "Parsing" parse lexbuf pp in

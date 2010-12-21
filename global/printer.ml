@@ -55,10 +55,10 @@ let print_call_params ff params = match params with
 
 let print_op ff op = match op with
   | OReg -> fprintf ff "reg"
-  | OMem(true, addr_size, word_size) -> (*ROM*)
+  | OMem(true, addr_size, word_size, _) -> (*ROM*)
     fprintf ff "rom<%a,%a>"
       print_static_exp addr_size  print_static_exp word_size
-  | OMem(false, addr_size, word_size) -> (*ROM*)
+  | OMem(false, addr_size, word_size, _) -> (*RAM*)
     fprintf ff "ram<%a,%a>"
       print_static_exp addr_size  print_static_exp word_size
   | OCall (fn, params) ->

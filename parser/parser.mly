@@ -9,8 +9,9 @@ open Location
 %token NODE ROM RAM WHERE CONST
 %token LPAREN RPAREN MUX COLON COMMA EQUAL REG OR XOR NAND AND POWER SLASH
 %token EOF RBRACKET LBRACKET GREATER LESS NOT SEMICOL PLUS MINUS STAR
-%token DOUBLE_LESS DOUBLE_GREATER IF THEN ELSE LEQ DOT DOTDOT
+%token IF THEN ELSE LEQ DOT DOTDOT
 %token <string> NAME
+%token <string> STRING
 %token <int> INT
 %token <bool> BOOL
 
@@ -58,7 +59,7 @@ node_dec:
 
 params:
   | /*empty*/ { [] }
-  | DOUBLE_LESS pl=snlist(COMMA,param) DOUBLE_GREATER { pl }
+  | LESS pl=snlist(COMMA,param) GREATER { pl }
 
 param:
   n=NAME { mk_param n }
@@ -127,12 +128,13 @@ prefix_prim:
 
 op:
   | REG { OReg }
-  | ro=rom_or_ram LESS addr_size=static_exp COMMA word_size=static_exp GREATER
-    { OMem(ro, addr_size, word_size) }
+  | ro=rom_or_ram LESS addr_size=static_exp
+    COMMA word_size=static_exp input_file=option(COMMA, STRING) GREATER
+    { OMem(ro, addr_size, word_size, input_file) }
   | n=NAME p=call_params { OCall (n,p) }
 
 call_params:
   | /*empty*/ { [] }
-  | DOUBLE_LESS pl=snlist(COMMA,static_exp) DOUBLE_GREATER { pl }
+  | LESS pl=snlist(COMMA,static_exp) GREATER { pl }
 
 %%

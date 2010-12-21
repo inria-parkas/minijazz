@@ -11,6 +11,14 @@ let try_2 = function
   | [v1; v2] -> v1, v2
   | l -> raise (Arity_error(2, List.length l))
 
+let try_3 = function
+  | [v1; v2; v3] -> v1, v2, v3
+  | l -> raise (Arity_error(3, List.length l))
+
+let try_4 = function
+  | [v1; v2; v3; v4] -> v1, v2, v3, v4
+  | l -> raise (Arity_error(4, List.length l))
+
 let try_1min = function
   | v::l -> v, l
   | l -> raise (Arity_min_error(1, List.length l))
@@ -35,6 +43,8 @@ let assert_min_fun f l =
 
 let assert_1 l = assert_fun try_1 l
 let assert_2 l = assert_fun try_2 l
+let assert_3 l = assert_fun try_3 l
+let assert_4 l = assert_fun try_4 l
 
 let assert_1min l = assert_min_fun try_1min l
 

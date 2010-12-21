@@ -70,8 +70,8 @@ struct
     | OSelect se -> OSelect (simplify m se)
     | OSlice (idx1, idx2) ->
         OSlice (simplify m idx1, simplify m idx2)
-    | OMem(b, se1, se2) ->
-        OMem (b, simplify m se1, simplify m se2)
+    | OMem(b, se1, se2, file) ->
+        OMem (b, simplify m se1, simplify m se2, file)
     | OCall(f, params) -> OCall(f, List.map (simplify m) params)
     | _ -> op
 
@@ -132,7 +132,7 @@ and translate_eq m subst acc ((pat, e) as eq) =
       | Eapp(OCall(f, params), args) when not (Misc.is_empty params) ->
           let params = List.map (simplify m) params in
           let b = inline_node m f params args pat in
-                (translate_block m subst b)@acc
+            (translate_block m subst b)@acc
       | _ -> eq::acc
 
 and translate_eqs m subst acc eqs =
