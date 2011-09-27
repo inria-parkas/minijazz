@@ -14,7 +14,6 @@ let rec read acc e =
   match e.e_desc with
     | Econst _ -> acc
     | Evar id -> add id acc
-    | Eapp(OReg, _) -> acc
     | Eapp(_, args) -> List.fold_left read acc args
 
 let read (_, e) = read [] e

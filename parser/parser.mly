@@ -103,7 +103,7 @@ _exp:
   | c=const                   { Econst c }
   | op=op a=exps              { Eapp(op, a) }
   | e1=exp op=infix_prim e2=exp { Eapp(OCall (op, []), [e1; e2])}
-  | op=prefix_prim a=exps     { Eapp(OCall (op, []), a)}
+  | op=prefix_prim a=exp     { Eapp(OCall (op, []), [a])}
   | e1=exp DOT e2=exp               { Eapp(OConcat, [e1; e2]) }
   | e1=exp LBRACKET idx=static_exp RBRACKET { Eapp(OSelect idx, [e1]) }
   | e1=exp LBRACKET low=static_exp DOTDOT high=static_exp RBRACKET
