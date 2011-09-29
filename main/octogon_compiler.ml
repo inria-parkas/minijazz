@@ -62,11 +62,13 @@ let compile_impl filename =
     (* Parsing of the file *)
     let p = do_pass "Parsing" parse lexbuf pp in
 
-    let p = pass "Scoping" true Scoping.program p pp in
-
     let p = pass "Normalize" true Normalize.program p pp in
 
+    let p = pass "Scoping" true Scoping.program p pp in
+
     let p = pass "Callgraph" true Callgraph.program p pp in
+
+    let p = pass "Simplify" true Simplify.program p pp in
 
     let p = pass "Causality" true Causality.program p pp in
 
