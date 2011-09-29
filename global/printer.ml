@@ -115,14 +115,6 @@ let print_eq ff (pat, e) =
 let print_eqs ff eqs =
   print_list_nlr print_eq """;""" ff eqs
 
-let rec print_block ff b = match b with
-  | BEqs (eqs, _) -> print_eqs ff eqs
-  | BIf(se, thenb, elseb) ->
-      fprintf ff "@[<v 2>if %a then@,%a@]@,@[<v 2>else@,%a@]"
-        print_static_exp se
-        print_block thenb
-        print_block elseb
-
 let print_var_dec ff vd = match vd.v_ty with
   | TUnit | TBit -> fprintf ff "%a" print_name vd.v_ident
   | TBitArray se ->
@@ -131,6 +123,16 @@ let print_var_dec ff vd = match vd.v_ty with
 
 let print_var_decs ff vds =
   print_list_r print_var_dec "("","")" ff vds
+
+let rec print_block ff b = match b with
+  | BEqs (eqs, []) -> print_eqs ff eqs
+  | BEqs (eqs, vds) ->
+    fprintf ff "var %a in@,%a" print_var_decs vds print_eqs eqs
+  | BIf(se, thenb, elseb) ->
+      fprintf ff "@[<v 2>if %a then@,%a@]@,@[<v 2>else@,%a@]"
+        print_static_exp se
+        print_block thenb
+        print_block elseb
 
 let print_param ff p =
   print_name ff p.p_name

@@ -55,6 +55,7 @@ let ident_of_exp e = match e.e_desc with
   | _ -> assert false
 
 let rename env vd =
+  Format.eprintf "Renaming %s@." vd.v_ident;
   IdentEnv.add vd.v_ident (mk_exp (Evar (vd.v_ident ^(Misc.gen_symbol ())))) env
 
 let build_params m names values =
@@ -62,6 +63,10 @@ let build_params m names values =
 
 let build_exp m vds values =
   List.fold_left2 (fun m { v_ident = n } e -> IdentEnv.add n e m) m vds values
+
+let rec find_local_vars b = match b with
+  | BEqs (_, vds) -> vds
+  | BIf (_, trueb, falseb) -> (find_local_vars trueb) @ (find_local_vars falseb)
 
 (** Substitutes idents with new names, static params with their values *)
 module Subst =
@@ -123,31 +128,26 @@ let rec inline_node m f params args pat =
   let m = build_params m n.n_params params in
   let subst = build_exp IdentEnv.empty n.n_inputs args in
   let subst = build_exp subst n.n_outputs (vars_of_pat pat) in
+  let locals = find_local_vars n.n_body in
+  let subst = List.fold_left rename subst locals in
   let b = Subst.do_subst_block m subst n.n_body in
     Normalize.block b
 
 and translate_eq m subst acc ((pat, e) as eq) =
-(*  let (pat, e) = Subst.do_subst_eq m subst eq in  *)
-    match e.e_desc with
-      | Eapp(OCall(f, params), args) when not (Misc.is_empty params) ->
-          let params = List.map (simplify m) params in
-          let b = inline_node m f params args pat in
-            (translate_block m subst b)@acc
-      | _ -> eq::acc
+  let (pat, e) = Subst.do_subst_eq m subst eq in
+  match e.e_desc with
+    | Eapp(OCall(f, params), args) when not (Misc.is_empty params) ->
+      let params = List.map (simplify m) params in
+      let b = inline_node m f params args pat in
+      (translate_block m subst b)@acc
+    | _ -> eq::acc
 
 and translate_eqs m subst acc eqs =
   List.fold_left (translate_eq m subst) acc eqs
 
 and translate_block m subst b =
   match b with
-    | BEqs (eqs, vds) ->
-        add_names vds;
-        let subst =
-          if NameEnv.is_empty m then
-            subst (* We are not inlining a node. Do nothing*)
-          else
-            List.fold_left rename subst vds in
-          translate_eqs m subst [] eqs
+    | BEqs (eqs, vds) -> translate_eqs m subst [] eqs
     | BIf(se, trueb, elseb) ->
         if expect_bool m se then
           translate_block m subst trueb

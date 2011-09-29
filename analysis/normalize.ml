@@ -6,6 +6,7 @@ let mk_eq e =
     Evar id, eq
 
 let rec mk_simple acc e = match e.e_desc with
+  | Eapp ((OSelect _ | OSlice _), _ ) -> e, acc
   | Eapp (op, args) ->
       let args, acc = Misc.mapfold mk_simple acc args in
       let desc, eq = mk_eq { e with e_desc = Eapp (op, args) } in

@@ -21,17 +21,21 @@ let rec check_exp const_env env e = match e.e_desc with
   | Eapp(_, args) -> List.iter (check_exp const_env env) args
   | _ -> ()
 
-let pat_vars l pat =
+let pat_vars env l pat =
   let add_id l id = (mk_var_dec id invalid_type)::l in
     match pat with
-    | Evarpat id -> add_id l id
+    | Evarpat id ->
+      if not (IdentEnv.mem id env) then
+        add_id l id
+      else
+        l
     | Etuplepat ids -> List.fold_left add_id l ids
 
 let build_vd env vd = IdentEnv.add vd.v_ident vd env
 
 let rec block const_env env b = match b with
   | BEqs (eqs, _) ->
-      let locals = List.fold_left (fun l (pat, _) -> pat_vars l pat) [] eqs in
+      let locals = List.fold_left (fun l (pat, _) -> pat_vars env l pat) [] eqs in
       let env = List.fold_left build_vd env locals in
         (* check names in equations *)
         List.iter (fun (_, e) -> check_exp const_env env e) eqs;
