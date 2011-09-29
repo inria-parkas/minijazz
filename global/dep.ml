@@ -1,10 +1,54 @@
-open Graph
 open Ast
+open Graph
+
+module Graph = struct
+  module G =
+    Imperative.Digraph.Abstract(struct
+      type t = equation
+    end)
+
+  module DepTopological = Topological.Make(G)
+  module DepTraverse = Traverse.Mark(G)
+
+  type graph =
+      { g_graph : G.t;
+        mutable g_env : (G.V.t * bool) IdentEnv.t }
+
+  let mk_graph () =
+   { g_graph = G.create ();
+     g_env = IdentEnv.empty }
+
+  let add_node g v ids is_antidep =
+    let n = G.V.create v in
+    G.add_vertex g.g_graph n;
+    g.g_env <- List.fold_left (fun env id -> IdentEnv.add id (n, is_antidep) env) g.g_env ids
+
+  let add_edge g v1 v2 is_antidep =
+    if is_antidep then
+      G.add_edge g.g_graph v2 v1
+    else
+      G.add_edge g.g_graph v1 v2
+
+  let node_for_ident g x =
+    IdentEnv.find x g.g_env
+
+  let topological g =
+    let l = DepTopological.fold (fun v acc -> (G.V.label v) :: acc) g.g_graph [] in
+    l
+
+  let has_cycle g =
+    DepTraverse.has_cycle g.g_graph
+end
+
 
 (** @return the variables defined by a pattern *)
 let def (pat, _) = match pat with
   | Evarpat id -> [id]
   | Etuplepat l -> l
+
+let is_antidep (_, e) = match e.e_desc with
+  | Eapp(OReg, _) -> true
+  | _ -> false
 
 let add id acc =
   if List.mem id acc then acc else id::acc
@@ -22,36 +66,29 @@ let mk_dependency_graph n =
   (** Creates the initial graph (one node for each equation)
       and an environment mapping idents to nodes. *)
   let init_graph () =
-    let add_eq (env, node_list) eq =
-      let ids = def eq in
-      let n = Graph.mk_node eq in
-      let env = List.fold_left (fun env id -> IdentEnv.add id n env) env ids in
-        env, n::node_list
-    in
     let eqs = match n.n_body with | BEqs (eqs, _) -> eqs | _ -> assert false in
-    let env, node_list = List.fold_left add_eq (IdentEnv.empty, []) eqs in
-    let top = List.map (fun vd -> IdentEnv.find vd.v_ident env) n.n_outputs in
-    let g = mk_graph (Misc.unique top) in
-      g, env
+    let g = Graph.mk_graph () in
+    List.iter (fun eq -> Graph.add_node g eq (def eq) (is_antidep eq)) eqs;
+    g
   in
   (** Add the dependences corresponding to the equation in the graph. *)
-  let add_depends env eq =
-    let node_for_eq env eq =
+  let add_depends g eq =
+    let node_for_eq g eq =
       let id, _ = Misc.assert_1min (def eq) in
-        IdentEnv.find id env
+        fst (Graph.node_for_ident g id)
     in
     let attach n1 n =
       try
-        let n2 = IdentEnv.find n env in
-          add_depends n1 n2
+        let n2, is_antidep = Graph.node_for_ident g n in
+          Graph.add_edge g n1 n2 is_antidep
       with
         | Not_found -> () (*n is an input, no dependency*)
     in
-    let node = node_for_eq env eq in
+    let node = node_for_eq g eq in
     let ids = read eq in
       List.iter (attach node) ids
   in
-  let g, env = init_graph () in
+  let g = init_graph () in
   let eqs = match n.n_body with | BEqs (eqs, _) -> eqs | _ -> assert false in
-    List.iter (add_depends env) eqs;
+    List.iter (add_depends g) eqs;
     g

@@ -18,6 +18,9 @@ let df = function
 
       flag ["ocaml"; "compile" ] (S[A"-w"; A"Ae"; A"-warn-error"; A"PU"]);
 
+      (* Tell ocamlbuild about the ocamlgraph library. *)
+      ocaml_lib ~extern:true ~dir:"+ocamlgraph" "graph"
+
   | _ -> ()
 
 let _ = dispatch df
