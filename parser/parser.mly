@@ -113,8 +113,8 @@ const:
   | b=BOOL { VBit b }
 
 rom_or_ram :
-  | ROM { true }
-  | RAM { false }
+  | ROM { MRom }
+  | RAM { MRam }
 
 infix_prim:
   | OR { "or" }

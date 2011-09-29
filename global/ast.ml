@@ -14,9 +14,11 @@ type ty =
   | TUnit | TBit | TBitArray of static_exp | TProd of ty list
 let invalid_type = TUnit
 
+type mem_kind = MRom | MRam
+
 type op =
   | OReg
-  | OMem of bool * static_exp * static_exp * string option
+  | OMem of mem_kind * static_exp * static_exp * string option
       (* ro * address size * word size * input file *)
   | OCall of name * static_exp list (*function, params*)
   | OSelect of static_exp
