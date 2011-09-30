@@ -66,6 +66,8 @@ let compile_impl filename =
 
     let p = pass "Scoping" true Scoping.program p pp in
 
+    let p = pass "Typing" true Typing.program p pp in
+
     let p = pass "Callgraph" true Callgraph.program p pp in
 
     let p = pass "Simplify" true Simplify.program p pp in

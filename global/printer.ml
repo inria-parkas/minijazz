@@ -48,6 +48,7 @@ let rec print_type ff ty = match ty with
   | TBit -> fprintf ff "bit"
   | TBitArray se -> fprintf ff "bit[%a]" print_static_exp se
   | TProd l ->  print_list_r print_type "" "*" "" ff l
+  | TVar _ -> fprintf ff "<var>"
 
 let print_call_params ff params = match params with
   | [] -> ()
@@ -116,10 +117,12 @@ let print_eqs ff eqs =
   print_list_nlr print_eq """;""" ff eqs
 
 let print_var_dec ff vd = match vd.v_ty with
-  | TUnit | TBit -> fprintf ff "%a" print_name vd.v_ident
+  | TUnit -> fprintf ff "%a : ." print_name vd.v_ident
+  | TBit -> fprintf ff "%a" print_name vd.v_ident
   | TBitArray se ->
     fprintf ff "%a : [%a]" print_name vd.v_ident  print_static_exp se
   | TProd _ -> assert false
+  | TVar _ -> fprintf ff "%a : <var>" print_name vd.v_ident
 
 let print_var_decs ff vds =
   print_list_r print_var_dec "("","")" ff vds

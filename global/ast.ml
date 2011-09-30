@@ -12,6 +12,10 @@ module NameSet = Set.Make (struct type t = name let compare = compare end)
 
 type ty =
   | TUnit | TBit | TBitArray of static_exp | TProd of ty list
+  | TVar of link ref
+and link =
+  | TIndex of int
+  | TLink of ty
 let invalid_type = TUnit
 
 type mem_kind = MRom | MRam
