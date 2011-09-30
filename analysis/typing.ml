@@ -217,7 +217,7 @@ and type_op env op args = match op with
     let read_addr = expect_exp env read_addr (TBitArray addr_size) in
       [read_addr], TBitArray word_size
   | OMem (MRam, addr_size, word_size, _) ->
-    let read_addr, write_addr, data_in, write_en = assert_4 args in
+    let read_addr, write_en, write_addr, data_in = assert_4 args in
     let read_addr = expect_exp env read_addr (TBitArray addr_size) in
     let write_addr = expect_exp env write_addr (TBitArray addr_size) in
     let data_in = expect_exp env data_in (TBitArray word_size) in
