@@ -43,6 +43,10 @@ let rec print_static_exp ff se = match se with
       | SGreater -> ">" | SGeq -> ">=" in
       fprintf ff "(%a %s %a)" print_static_exp se1  op_str  print_static_exp se2
 
+let rec print_static_type ff sty = match sty with
+  | STInt -> fprintf ff "int"
+  | STBool -> fprintf ff "bool"
+
 let rec print_type ff ty = match ty with
   | TUnit -> fprintf ff "()"
   | TBit -> fprintf ff "bit"

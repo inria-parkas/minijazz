@@ -69,6 +69,7 @@ type node_dec = {
   n_inputs : var_dec list;
   n_outputs : var_dec list;
   n_params : param list;
+  n_constraints : static_exp list;
   n_body : block;
 }
 
@@ -100,7 +101,7 @@ let mk_param n =
 
 let mk_node n loc inputs outputs params b =
   { n_name = n; n_inputs = inputs; n_outputs = outputs;
-    n_body = b; n_params = params;
+    n_body = b; n_params = params; n_constraints = [];
     n_loc = loc }
 
 let mk_program cds nds =

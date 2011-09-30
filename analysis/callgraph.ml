@@ -55,7 +55,6 @@ let ident_of_exp e = match e.e_desc with
   | _ -> assert false
 
 let rename env vd =
-  Format.eprintf "Renaming %s@." vd.v_ident;
   IdentEnv.add vd.v_ident (mk_exp (Evar (vd.v_ident ^(Misc.gen_symbol ())))) env
 
 let build_params m names values =
@@ -114,8 +113,16 @@ struct
           BIf(se, trueb, falseb)
 end
 
+let check_params loc param_names params cl =
+  let env = build_params NameEnv.empty param_names params in
+  try
+    check_true env cl
+  with Unsatisfiable(c) ->
+    Format.eprintf "%aThe following constraint is not satisfied: %a@."
+      print_location loc  Printer.print_static_exp c;
+    raise Error
 
-let rec inline_node m f params args pat =
+let rec inline_node loc m f params args pat =
   (* Check that the definition is sound *)
   if List.mem (f, params) !call_stack then (
     Format.eprintf "A circular definition was found.@.";
@@ -125,6 +132,7 @@ let rec inline_node m f params args pat =
 
   (* do the actual work *)
   let n = find_node f in
+  check_params loc n.n_params params n.n_constraints;
   let m = build_params m n.n_params params in
   let subst = build_exp IdentEnv.empty n.n_inputs args in
   let subst = build_exp subst n.n_outputs (vars_of_pat pat) in
@@ -138,7 +146,7 @@ and translate_eq m subst acc ((pat, e) as eq) =
   match e.e_desc with
     | Eapp(OCall(f, params), args) when not (Misc.is_empty params) ->
       let params = List.map (simplify m) params in
-      let b = inline_node m f params args pat in
+      let b = inline_node e.e_loc m f params args pat in
       (translate_block m subst b)@acc
     | _ -> eq::acc
 
