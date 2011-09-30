@@ -63,9 +63,12 @@ type block =
     | BEqs of equation list * var_dec list
     | BIf of static_exp * block * block
 
+type inlined_status = Inlined | NotInlined
+
 type node_dec = {
   n_name : name;
   n_loc: location;
+  n_inlined : inlined_status;
   n_inputs : var_dec list;
   n_outputs : var_dec list;
   n_params : param list;
@@ -99,10 +102,10 @@ let mk_var_dec n ty =
 let mk_param n =
   { p_name = n }
 
-let mk_node n loc inputs outputs params b =
+let mk_node n loc inlined inputs outputs params b =
   { n_name = n; n_inputs = inputs; n_outputs = outputs;
     n_body = b; n_params = params; n_constraints = [];
-    n_loc = loc }
+    n_loc = loc; n_inlined = inlined }
 
 let mk_program cds nds =
   { p_consts = cds; p_nodes = nds }

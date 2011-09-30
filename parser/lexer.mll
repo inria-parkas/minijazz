@@ -30,7 +30,8 @@ List.iter (fun (str,tok) -> Hashtbl.add keyword_table str tok) [
  "mux", MUX;
  "if", IF;
  "then", THEN;
- "else", ELSE
+ "else", ELSE;
+ "inlined", INLINED
 ]
 
 

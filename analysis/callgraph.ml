@@ -148,6 +148,14 @@ and translate_eq m subst acc ((pat, e) as eq) =
       let params = List.map (simplify m) params in
       let b = inline_node e.e_loc m f params args pat in
       (translate_block m subst b)@acc
+    (* Inline nodes that were declared inlined *)
+    | Eapp(OCall(f, _), args) ->
+      let n = find_node f in
+      if n.n_inlined = Inlined then
+        let b = inline_node e.e_loc m f [] args pat in
+        (translate_block m subst b)@acc
+      else
+        eq::acc
     | _ -> eq::acc
 
 and translate_eqs m subst acc eqs =

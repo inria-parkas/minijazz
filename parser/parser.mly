@@ -6,7 +6,7 @@ open Location
 
 %}
 
-%token NODE ROM RAM WHERE CONST
+%token INLINED NODE ROM RAM WHERE CONST
 %token LPAREN RPAREN MUX COLON COMMA EQUAL REG OR XOR NAND AND POWER SLASH
 %token EOF RBRACKET LBRACKET GREATER LESS NOT SEMICOL PLUS MINUS STAR
 %token IF THEN ELSE LEQ DOT DOTDOT
@@ -53,9 +53,13 @@ type_ident: LBRACKET se=static_exp RBRACKET { TBitArray se }
 
 node_decs: ns=list(node_dec) {ns}
 node_dec:
-  NODE n=name p=params LPAREN args=args RPAREN
+  inlined=inlined_status NODE n=name p=params LPAREN args=args RPAREN
   EQUAL LPAREN out=args RPAREN WHERE b=block
-      { mk_node n (Loc ($startpos,$endpos)) args out p b }
+      { mk_node n (Loc ($startpos,$endpos)) inlined args out p b }
+
+inlined_status:
+  | INLINED { Inlined }
+  | /*empty*/ { NotInlined }
 
 params:
   | /*empty*/ { [] }
