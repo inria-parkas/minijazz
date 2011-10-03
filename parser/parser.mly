@@ -115,6 +115,7 @@ _exp:
 
 const:
   | b=BOOL { VBit b }
+  | LBRACKET bl=nonempty_list(BOOL) RBRACKET { VBitArray (Array.of_list bl) }
 
 rom_or_ram :
   | ROM { MRom }
