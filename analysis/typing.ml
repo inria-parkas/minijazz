@@ -107,6 +107,7 @@ let rec unify ty1 ty2 =
   if ty1 == ty2 then ()
   else
    match (ty1, ty2) with
+     | TBitArray n, TBit | TBit, TBitArray n -> add_constraint (SBinOp(SEqual, n, SInt 1))
      | TBitArray n1, TBitArray n2 -> add_constraint (SBinOp(SEqual, n1, n2))
      | TVar { contents = TIndex n1 }, TVar { contents = TIndex n2 } when n1 = n2 -> ()
      | TProd ty_list1, TProd ty_list2 ->
@@ -160,6 +161,18 @@ let solve_constr params cl =
         solve_one cl
   in
   solve_one cl
+
+let subst_from_condition se = match se with
+  | SBinOp(SEqual, SVar n, se1) | SBinOp(SEqual, se1, SVar n) ->
+    NameEnv.add n se1 NameEnv.empty
+  | _ -> NameEnv.empty
+
+let simplify_ty env ty = match ty with
+  | TBitArray se -> TBitArray (simplify env se)
+  | _ -> ty
+
+let simplify_env env =
+  IdentEnv.map (simplify_ty env)
 
 (* Typing of expressions *)
 let rec type_exp env e =
@@ -253,18 +266,20 @@ let rec type_block env b = match b with
     let env = build env vds in
     let eqs = List.map (type_eq env) eqs in
     BEqs(eqs,vds)
-  | BIf(e, trueb, falseb) ->
-    (*todo: type static exps *)
-    let trueb = type_block env trueb in
+  | BIf(se, trueb, falseb) ->
+    expect_static_exp Location.no_location se STBool;
     let falseb = type_block env falseb in
-    BIf(e, trueb, falseb)
+    (* Type the true block using the information guven by the condition*)
+    let new_env = simplify_env (subst_from_condition se) env in
+    let trueb = type_block new_env trueb in
+    BIf(se, trueb, falseb)
 
+(* Recursively replace type variables with their values *)
 let rec repr_ty_block b = match b with
   | BEqs(eqs, vds) ->
     let vds = List.map (fun vd -> { vd with v_ty = ty_repr vd.v_ty }) vds in
     BEqs(eqs,vds)
   | BIf(e, trueb, falseb) ->
-    expect_static_exp Location.no_location e STBool;
     let trueb = repr_ty_block trueb in
     let falseb = repr_ty_block falseb in
     BIf(e, trueb, falseb)
