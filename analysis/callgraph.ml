@@ -156,6 +156,11 @@ and translate_eq m subst acc ((pat, e) as eq) =
         (translate_block m subst b)@acc
       else
         eq::acc
+    | Eapp(OMem(mem_kind, addr_size, word_size, f), args) ->
+      let addr_size = simplify m addr_size in
+      let word_size = simplify m word_size in
+      let e = { e with e_desc = Eapp(OMem(mem_kind, addr_size, word_size, f), args) } in
+      (pat, e)::acc
     | _ -> eq::acc
 
 and translate_eqs m subst acc eqs =

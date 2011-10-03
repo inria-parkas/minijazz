@@ -9,6 +9,16 @@ let rec simplify_exp e = match e.e_desc with
         let new_i = Static.simplify NameEnv.empty new_i in
         let new_e = { e with e_desc = Eapp(OSelect new_i, args) } in
         simplify_exp new_e
+      | OSlice (i1, i2), _ when i1 = i2 ->
+        let new_e = { e with e_desc = Eapp (OSelect i1, args) } in
+        simplify_exp new_e
+      | OSlice (min1, max1), Eapp(OSlice(min2, max2), args) ->
+        let new_min = SBinOp (SMinus, SBinOp (SAdd, min2, min1), SInt 1) in
+        let new_min = Static.simplify NameEnv.empty new_min in
+        let new_max = SBinOp (SMinus, SBinOp (SAdd, min2, max1), SInt 1) in
+        let new_max = Static.simplify NameEnv.empty new_max in
+        let new_e = { e with e_desc = Eapp(OSlice (new_min, new_max), args) } in
+        simplify_exp new_e
       | op, _ -> { e with e_desc = Eapp(op, List.map simplify_exp args) }
     )
   | Eapp(op, args) ->
