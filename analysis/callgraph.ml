@@ -37,10 +37,7 @@ let add_names vds =
 (** Find a node by name*)
 let nodes_list = ref []
 let find_node f =
-  try
-    List.find (fun n -> f = n.n_name) !nodes_list
-  with
-    | Not_found -> Format.eprintf "Unbound function '%s'@." f; raise Error
+  List.find (fun n -> f = n.n_name) !nodes_list
 
 let vars_of_pat pat =
   let exp_of_ident id = mk_exp (Evar id) in
@@ -150,12 +147,17 @@ and translate_eq m subst acc ((pat, e) as eq) =
       (translate_block m subst b)@acc
     (* Inline nodes that were declared inlined *)
     | Eapp(OCall(f, _), args) ->
-      let n = find_node f in
-      if n.n_inlined = Inlined then
-        let b = inline_node e.e_loc m f [] args pat in
-        (translate_block m subst b)@acc
-      else
-        eq::acc
+        (try
+            let n = find_node f in
+              if n.n_inlined = Inlined then
+                let b = inline_node e.e_loc m f [] args pat in
+                  (translate_block m subst b)@acc
+              else
+                eq::acc
+          with
+              Not_found -> (* Predefined function*)
+                eq::acc
+        )
     | Eapp(OMem(mem_kind, addr_size, word_size, f), args) ->
       let addr_size = simplify m addr_size in
       let word_size = simplify m word_size in
