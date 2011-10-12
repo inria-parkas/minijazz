@@ -9,6 +9,12 @@ open Errors
 
 exception Unbound_identifier of ident
 
+let defnames = ref IdentSet.empty
+let add_defname id =
+  defnames := IdentSet.add id !defnames
+let reset_defnames () =
+  defnames := IdentSet.empty
+
 let simplify_ty env ty = match ty with
   | TBitArray se -> TBitArray (simplify env se)
   | _ -> ty
@@ -25,6 +31,7 @@ let rec check_exp const_env env e = match e.e_desc with
 
 let pat_vars env l pat =
   let add_id env l id =
+    add_defname id;
     if not (IdentEnv.mem id env) then
       (mk_var_dec id invalid_type)::l
     else
@@ -52,6 +59,7 @@ let node const_env n =
   let env =  List.fold_left build_vd env n.n_outputs in
     Modules.add_node n;
   (*simplify static exps in inputs/outputs types*)
+  reset_defnames ();
   let body =
     try
       block const_env env n.n_body
@@ -60,6 +68,12 @@ let node const_env n =
         Format.eprintf "%aThe identifier '%s' is unbound@." print_location n.n_loc  id;
         raise Error
   in
+  let undefined_outputs =
+    List.filter (fun vd -> not (IdentSet.mem vd.v_ident !defnames)) n.n_outputs in
+  if undefined_outputs <> [] then (
+    Format.eprintf "%aThe following outputs are not defined: %a@."
+      print_location n.n_loc  Printer.print_var_decs undefined_outputs;
+    raise Error);
   { n with
     n_body = body;
     n_inputs = List.map (simplify_vd const_env) n.n_inputs;
