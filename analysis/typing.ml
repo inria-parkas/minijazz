@@ -273,7 +273,7 @@ and type_op env op args = match op with
     let write_addr = expect_exp env write_addr (TBitArray addr_size) in
     let data_in = expect_exp env data_in (TBitArray word_size) in
     let write_en = expect_exp env write_en TBit in
-      [read_addr; write_addr; data_in; write_en], TBitArray word_size
+      [read_addr; write_en; write_addr; data_in], TBitArray word_size
   | OCall (f, params) ->
     let s = Modules.find_node f params in
     (*check arity*)
