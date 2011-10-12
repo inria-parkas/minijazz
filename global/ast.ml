@@ -74,6 +74,7 @@ type node_dec = {
   n_params : param list;
   n_constraints : static_exp list;
   n_body : block;
+  n_probes : ident list;
 }
 
 type const_dec = {
@@ -102,10 +103,10 @@ let mk_var_dec n ty =
 let mk_param n =
   { p_name = n }
 
-let mk_node n loc inlined inputs outputs params b =
+let mk_node n loc inlined inputs outputs params b probes =
   { n_name = n; n_inputs = inputs; n_outputs = outputs;
     n_body = b; n_params = params; n_constraints = [];
-    n_loc = loc; n_inlined = inlined }
+    n_loc = loc; n_inlined = inlined; n_probes = probes }
 
 let mk_program cds nds =
   { p_consts = cds; p_nodes = nds }

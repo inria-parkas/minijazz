@@ -31,7 +31,8 @@ List.iter (fun (str,tok) -> Hashtbl.add keyword_table str tok) [
  "if", IF;
  "then", THEN;
  "else", ELSE;
- "inlined", INLINED
+ "inlined", INLINED;
+ "probing", PROBING
 ]
 
 

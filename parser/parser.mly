@@ -7,7 +7,7 @@ open Misc
 
 %}
 
-%token INLINED NODE ROM RAM WHERE CONST
+%token INLINED NODE ROM RAM WHERE CONST PROBING
 %token LPAREN RPAREN MUX COLON COMMA EQUAL REG OR XOR NAND AND POWER SLASH
 %token EOF RBRACKET LBRACKET GREATER LESS NOT SEMICOL PLUS MINUS STAR
 %token IF THEN ELSE LEQ DOT DOTDOT
@@ -56,8 +56,8 @@ type_ident: LBRACKET se=static_exp RBRACKET { TBitArray se }
 node_decs: ns=list(node_dec) { ns }
 node_dec:
   inlined=inlined_status NODE n=name p=params LPAREN args=args RPAREN
-  EQUAL LPAREN out=args RPAREN WHERE b=block
-      { mk_node n (Loc ($startpos,$endpos)) inlined args out p b }
+  EQUAL LPAREN out=args RPAREN WHERE b=block probes=probe_decls
+      { mk_node n (Loc ($startpos,$endpos)) inlined args out p b probes }
 
 inlined_status:
   | INLINED { Inlined }
@@ -144,4 +144,7 @@ call_params:
   | /*empty*/ { [] }
   | LESS pl=snlist(COMMA,static_exp) GREATER { pl }
 
+probe_decls:
+  | /*empty*/ { [] }
+  | PROBING l=separated_nonempty_list(COMMA, NAME) { l }
 %%
