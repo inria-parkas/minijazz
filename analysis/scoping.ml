@@ -24,14 +24,15 @@ let rec check_exp const_env env e = match e.e_desc with
   | _ -> ()
 
 let pat_vars env l pat =
-  let add_id l id = (mk_var_dec id invalid_type)::l in
-    match pat with
-    | Evarpat id ->
-      if not (IdentEnv.mem id env) then
-        add_id l id
-      else
-        l
-    | Etuplepat ids -> List.fold_left add_id l ids
+  let add_id env l id =
+    if not (IdentEnv.mem id env) then
+      (mk_var_dec id invalid_type)::l
+    else
+      l
+  in
+  match pat with
+    | Evarpat id -> add_id env l id
+    | Etuplepat ids -> List.fold_left (add_id env) l ids
 
 let build_vd env vd = IdentEnv.add vd.v_ident vd env
 
