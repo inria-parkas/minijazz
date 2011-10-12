@@ -18,6 +18,7 @@ type static_ty = STInt | STBool
 let fun_of_op op = match op with
   | SAdd -> (+) | SMinus -> (-)
   | SMult -> (fun i1 i2 -> i1 * i2)
+  | SDiv -> (/)
   | _ -> assert false
 
 let fun_of_comp_op op = match op with

@@ -5,8 +5,6 @@ open Errors
 
 (** Inlines all nodes with static paramaters. *)
 
-let call_stack = ref []
-
 let expect_bool env se =
   match simplify env se with
     | SBool v -> v
@@ -119,13 +117,13 @@ let check_params loc param_names params cl =
       print_location loc  Printer.print_static_exp c;
     raise Error
 
-let rec inline_node loc m f params args pat =
+let rec inline_node loc m call_stack f params args pat =
   (* Check that the definition is sound *)
-  if List.mem (f, params) !call_stack then (
-    Format.eprintf "A circular definition was found.@.";
+  if List.mem (f, params) call_stack then (
+    Format.eprintf "The definition of %s is circular.@." f;
     raise Error
   );
-  call_stack := (f, params)::(!call_stack);
+  let call_stack = (f, params)::call_stack in
 
   (* do the actual work *)
   let n = find_node f in
@@ -136,22 +134,22 @@ let rec inline_node loc m f params args pat =
   let locals = find_local_vars n.n_body in
   let subst = List.fold_left rename subst locals in
   let b = Subst.do_subst_block m subst n.n_body in
-    Normalize.block b
+    Normalize.block b, call_stack
 
-and translate_eq m subst acc ((pat, e) as eq) =
+and translate_eq m subst call_stack acc ((pat, e) as eq) =
   let (pat, e) = Subst.do_subst_eq m subst eq in
   match e.e_desc with
     | Eapp(OCall(f, params), args) when not (Misc.is_empty params) ->
       let params = List.map (simplify m) params in
-      let b = inline_node e.e_loc m f params args pat in
-      (translate_block m subst b)@acc
+      let b, call_stack = inline_node e.e_loc m call_stack f params args pat in
+      (translate_block m subst call_stack b)@acc
     (* Inline nodes that were declared inlined *)
     | Eapp(OCall(f, _), args) ->
         (try
             let n = find_node f in
               if n.n_inlined = Inlined then
-                let b = inline_node e.e_loc m f [] args pat in
-                  (translate_block m subst b)@acc
+                let b, call_stack = inline_node e.e_loc m call_stack f [] args pat in
+                  (translate_block m subst call_stack b)@acc
               else
                 eq::acc
           with
@@ -165,26 +163,26 @@ and translate_eq m subst acc ((pat, e) as eq) =
       (pat, e)::acc
     | _ -> eq::acc
 
-and translate_eqs m subst acc eqs =
-  List.fold_left (translate_eq m subst) acc eqs
+and translate_eqs m subst call_stack acc eqs =
+  List.fold_left (translate_eq m subst call_stack) acc eqs
 
-and translate_block m subst b =
+and translate_block m subst call_stack b =
   match b with
-    | BEqs (eqs, vds) -> translate_eqs m subst [] eqs
+    | BEqs (eqs, vds) -> translate_eqs m subst call_stack [] eqs
     | BIf(se, trueb, elseb) ->
         if expect_bool m se then
-          translate_block m subst trueb
+          translate_block m subst call_stack trueb
         else
-          translate_block m subst elseb
+          translate_block m subst call_stack elseb
 
 let node m n =
   (*Init state*)
   reset_names ();
   add_names n.n_inputs;
   add_names n.n_outputs;
-  call_stack := [(n.n_name, [])];
+  let call_stack = [(n.n_name, [])] in
   (*Do the translation*)
-  let eqs = translate_block m IdentEnv.empty n.n_body in
+  let eqs = translate_block m IdentEnv.empty call_stack n.n_body in
     { n with n_body = BEqs (eqs, []) } (** TODO : var_decs*)
 
 let build_cd env cd =

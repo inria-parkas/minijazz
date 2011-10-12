@@ -7,6 +7,8 @@ open Errors
     Adds local vars to node.n_locals.
     Also simplifies static exp when possible. *)
 
+exception Unbound_identifier of ident
+
 let simplify_ty env ty = match ty with
   | TBitArray se -> TBitArray (simplify env se)
   | _ -> ty
@@ -16,8 +18,8 @@ let simplify_vd env vd =
 
 let rec check_exp const_env env e = match e.e_desc with
   | Evar id ->
-    if not (IdentEnv.mem id env) then (
-      Format.eprintf "The identifier '%s' is unbound@." id; raise Error)
+    if not (IdentEnv.mem id env) then
+      raise (Unbound_identifier id)
   | Eapp(_, args) -> List.iter (check_exp const_env env) args
   | _ -> ()
 
@@ -49,8 +51,16 @@ let node const_env n =
   let env =  List.fold_left build_vd env n.n_outputs in
     Modules.add_node n;
   (*simplify static exps in inputs/outputs types*)
+  let body =
+    try
+      block const_env env n.n_body
+    with
+      | Unbound_identifier id ->
+        Format.eprintf "%aThe identifier '%s' is unbound@." print_location n.n_loc  id;
+        raise Error
+  in
   { n with
-    n_body = block const_env env n.n_body;
+    n_body = body;
     n_inputs = List.map (simplify_vd const_env) n.n_inputs;
     n_outputs = List.map (simplify_vd const_env) n.n_outputs }
 

@@ -68,3 +68,17 @@ let gen_symbol =
     "_"^(string_of_int !counter)
   in
     _gen_symbol
+
+let bool_of_string s = match s with
+  | "t" | "1" -> true
+  | "f" | "0" -> false
+  | _ -> raise (Invalid_argument ("bool_of_string"))
+
+let bool_array_of_string s =
+  (* remove 0b in front *)
+  let i0 = String.index s 'b' in
+  let a = Array.make (String.length s - i0 - 1) false in
+  for i = i0 + 1 to String.length s - 1 do
+    a.(i - i0 - 1) <- bool_of_string (String.sub s i 1)
+  done;
+  a

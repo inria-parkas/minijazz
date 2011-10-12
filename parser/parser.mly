@@ -3,6 +3,7 @@
 open Static
 open Ast
 open Location
+open Misc
 
 %}
 
@@ -13,6 +14,7 @@ open Location
 %token <string> NAME
 %token <string> STRING
 %token <int> INT
+%token <string> BOOL_INT
 %token <bool> BOOL
 
 %left OR
@@ -51,7 +53,7 @@ name: n=NAME { n }
 
 type_ident: LBRACKET se=static_exp RBRACKET { TBitArray se }
 
-node_decs: ns=list(node_dec) {ns}
+node_decs: ns=list(node_dec) { ns }
 node_dec:
   inlined=inlined_status NODE n=name p=params LPAREN args=args RPAREN
   EQUAL LPAREN out=args RPAREN WHERE b=block
@@ -108,6 +110,7 @@ _exp:
   | op=op a=exps              { Eapp(op, a) }
   | e1=exp op=infix_prim e2=exp { Eapp(OCall (op, []), [e1; e2])}
   | op=prefix_prim a=exp     { Eapp(OCall (op, []), [a])}
+  | MUX ce=exp THEN fe=exp ELSE te=exp { Eapp(OCall ("mux", []), [ce; fe; te]) }
   | e1=exp DOT e2=exp               { Eapp(OConcat, [e1; e2]) }
   | e1=exp LBRACKET idx=static_exp RBRACKET { Eapp(OSelect idx, [e1]) }
   | e1=exp LBRACKET low=static_exp DOTDOT high=static_exp RBRACKET
@@ -115,7 +118,7 @@ _exp:
 
 const:
   | b=BOOL { VBit b }
-  | LBRACKET bl=nonempty_list(BOOL) RBRACKET { VBitArray (Array.of_list bl) }
+  | b=BOOL_INT { VBitArray (bool_array_of_string b) }
 
 rom_or_ram :
   | ROM { MRom }
@@ -129,7 +132,6 @@ infix_prim:
 
 prefix_prim:
   | NOT { "not" }
-  | MUX { "mux" }
 
 op:
   | REG { OReg }
