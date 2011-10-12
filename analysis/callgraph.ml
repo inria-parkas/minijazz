@@ -130,7 +130,7 @@ let rec inline_node loc m call_stack f params args pat =
   check_params loc n.n_params params n.n_constraints;
   let m = build_params m n.n_params params in
   let subst = build_exp IdentEnv.empty n.n_inputs args in
-  let subst = build_exp subst n.n_outputs (vars_of_pat pat) in
+  let subst = build_exp subst n.n_outputs (List.rev (vars_of_pat pat)) in
   let locals = find_local_vars n.n_body in
   let subst = List.fold_left rename subst locals in
   let b = Subst.do_subst_block m subst n.n_body in
