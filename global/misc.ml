@@ -54,6 +54,13 @@ let mapfold f acc l =
                 ([],acc) l in
   List.rev l, acc
 
+let mapi f l =
+  let rec aux i = function
+    | [] -> []
+    | v::l -> (f i v)::(aux (i+1) l)
+  in
+    aux 1 l
+
 let unique l =
   let tbl = Hashtbl.create (List.length l) in
   List.iter (fun i -> Hashtbl.replace tbl i ()) l;
@@ -89,10 +96,17 @@ let convert_size s n =
   else
     if m = n then s else (String.make (n - m) '0')^s
 
-let binary_string_of_int i n =
+let binary_not s =
+  for i=0 to String.length s - 1 do
+    s.[i] <- if s.[i] = '0' then '1' else '0'
+  done;
+  s
+
+let rec binary_string_of_int i n =
   let rec s_of_i i = match i with
     | 0 -> "0"
     | 1 -> "1"
+    | i when i < 0 -> binary_not (binary_string_of_int (-i-1) n)
     | _ ->
       let q, r = i / 2, i mod 2 in
       (s_of_i q) ^ (s_of_i r)
