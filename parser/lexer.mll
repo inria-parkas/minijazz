@@ -116,8 +116,8 @@ rule token = parse
       { let s = Lexing.lexeme lexbuf in
         try Hashtbl.find keyword_table s
         with Not_found -> NAME id }
-  | '0' ['b' 'B'] ['0'-'1']+
-      { BOOL_INT (Lexing.lexeme lexbuf) }
+  | '0' ['b' 'B'] (['0'-'1']+ as lit)
+      { BOOL_INT lit }
   | ['0'-'9']+
   | '0' ['x' 'X'] ['0'-'9' 'A'-'F' 'a'-'f']+
   | '0' ['o' 'O'] ['0'-'7']+

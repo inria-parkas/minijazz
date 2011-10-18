@@ -75,10 +75,27 @@ let bool_of_string s = match s with
   | _ -> raise (Invalid_argument ("bool_of_string"))
 
 let bool_array_of_string s =
-  (* remove 0b in front *)
-  let i0 = String.index s 'b' in
-  let a = Array.make (String.length s - i0 - 1) false in
-  for i = i0 + 1 to String.length s - 1 do
-    a.(i - i0 - 1) <- bool_of_string (String.sub s i 1)
+  let a = Array.make (String.length s) false in
+  for i = 0 to String.length s - 1 do
+    a.(i) <- bool_of_string (String.sub s i 1)
   done;
   a
+
+exception Int_too_big
+let convert_size s n =
+  let m = String.length s in
+  if m > n then
+    raise Int_too_big
+  else
+    if m = n then s else (String.make (n - m) '0')^s
+
+let binary_string_of_int i n =
+  let rec s_of_i i = match i with
+    | 0 -> "0"
+    | 1 -> "1"
+    | _ ->
+      let q, r = i / 2, i mod 2 in
+      (s_of_i q) ^ (s_of_i r)
+  in
+  convert_size (s_of_i i) n
+
