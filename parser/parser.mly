@@ -90,6 +90,7 @@ pat:
 static_exp :
   | i=INT { SInt i }
   | n=NAME { SVar n }
+  | LPAREN se=static_exp RPAREN { se }
   /*integer ops*/
   | se1=static_exp POWER se2=static_exp { SBinOp(SPower, se1, se2) }
   | se1=static_exp PLUS se2=static_exp { SBinOp(SAdd, se1, se2) }

@@ -242,6 +242,15 @@ and type_op env op args = match op with
     let e2 = expect_exp env e2 TBit in
     let e3 = expect_exp env e3 TBit in
     [e1; e2; e3], TBit
+  | OCall ("print", [n]) ->
+      let e1, enable = assert_2 args in
+      let enable = expect_exp env enable TBit in
+      let e1 = expect_exp env e1 (TBitArray n) in
+        [e1; enable], TBit
+  | OCall ("input", [n]) ->
+      let e1 = assert_1 args in
+      let e1 = expect_exp env e1 TBit in
+      [e1], TBitArray n
   | OSelect i ->
     let e = assert_1 args in
     let n = fresh_static_var () in

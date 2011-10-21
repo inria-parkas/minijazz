@@ -139,12 +139,16 @@ let rec inline_node loc m call_stack f params args pat =
 and translate_eq m subst call_stack acc ((pat, e) as eq) =
   let (pat, e) = Subst.do_subst_eq m subst eq in
   match e.e_desc with
+    | Eapp(OCall(("print" | "input") as f, params), args) ->
+        let params = List.map (simplify m) params in
+        let e = { e with e_desc =  Eapp(OCall(f, params), args) } in
+          (pat, e)::acc
     | Eapp(OCall(f, params), args) when not (Misc.is_empty params) ->
       let params = List.map (simplify m) params in
       let b, call_stack = inline_node e.e_loc m call_stack f params args pat in
       (translate_block m subst call_stack b)@acc
     (* Inline nodes that were declared inlined *)
-    | Eapp(OCall(f, _), args) ->
+    | Eapp(OCall(f, params), args) ->
         (try
             let n = find_node f in
               if n.n_inlined = Inlined then
@@ -161,6 +165,15 @@ and translate_eq m subst call_stack acc ((pat, e) as eq) =
       let word_size = simplify m word_size in
       let e = { e with e_desc = Eapp(OMem(mem_kind, addr_size, word_size, f), args) } in
       (pat, e)::acc
+    | Eapp(OSlice(i1, i2), args) ->
+        let i1 = simplify m i1 in
+        let i2 = simplify m i2 in
+        let e = { e with e_desc = Eapp(OSlice(i1, i2), args) } in
+          (pat, e)::acc
+    | Eapp(OSelect i1, args) ->
+        let i1 = simplify m i1 in
+        let e = { e with e_desc = Eapp(OSelect i1, args) } in
+          (pat, e)::acc
     | _ -> eq::acc
 
 and translate_eqs m subst call_stack acc eqs =

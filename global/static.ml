@@ -15,10 +15,21 @@ type static_exp =
 
 type static_ty = STInt | STBool
 
+let pow a n =
+  let rec g p x = function
+  | 0 -> x
+  | i ->
+      g (p * p) (if i mod 2 = 1 then p * x else x) (i/2)
+  in
+  g a 1 n
+;;
+
+
 let fun_of_op op = match op with
   | SAdd -> (+) | SMinus -> (-)
   | SMult -> (fun i1 i2 -> i1 * i2)
   | SDiv -> (/)
+  | SPower -> pow
   | _ -> assert false
 
 let fun_of_comp_op op = match op with
@@ -38,7 +49,7 @@ let rec _simplify is_rec env se = match se with
           | Not_found -> se)
   | SBinOp(op, se1, se2) ->
     (match op, _simplify is_rec env se1, _simplify is_rec env se2 with
-      | (SAdd | SMinus | SDiv  | SMult), SInt i1, SInt i2 ->
+      | (SAdd | SMinus | SDiv  | SMult | SPower), SInt i1, SInt i2 ->
           let f = fun_of_op op in
             SInt (f i1 i2)
       | (SEqual | SLess | SLeq | SGreater | SGeq), SInt i1, SInt i2 ->
