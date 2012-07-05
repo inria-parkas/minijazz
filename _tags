@@ -1,5 +1,4 @@
-<**/*.ml>: debug, dtypes
-<global/dep.ml>: use_graph
-<**/*.{byte,native}>: use_unix, use_str, link_menhirLib, use_graph, debug
+<global/dep.ml>: pkg_ocamlgraph
+<**/*.{byte,native}>: use_unix, use_str, pkg_menhirLib, pkg_ocamlgraph
 <global> or <parser> or <main> or <analysis> or <simulator> or <assembler>: include
 true: use_menhir

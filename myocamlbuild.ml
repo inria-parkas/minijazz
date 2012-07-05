@@ -1,25 +1,38 @@
+(***********************************************************************)
+(*                                                                     *)
+(*                             Heptagon                                *)
+(*                                                                     *)
+(* Gwenael Delaval, LIG/INRIA, UJF                                     *)
+(* Leonard Gerard, Parkas, ENS                                         *)
+(* Adrien Guatto, Parkas, ENS                                          *)
+(* Cedric Pasteur, Parkas, ENS                                         *)
+(* Marc Pouzet, Parkas, ENS                                            *)
+(*                                                                     *)
+(* Copyright 2012 ENS, INRIA, UJF                                      *)
+(*                                                                     *)
+(* This file is part of the Heptagon compiler.                         *)
+(*                                                                     *)
+(* Heptagon is free software: you can redistribute it and/or modify it *)
+(* under the terms of the GNU General Public License as published by   *)
+(* the Free Software Foundation, either version 3 of the License, or   *)
+(* (at your option) any later version.                                 *)
+(*                                                                     *)
+(* Heptagon is distributed in the hope that it will be useful,         *)
+(* but WITHOUT ANY WARRANTY; without even the implied warranty of      *)
+(* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the       *)
+(* GNU General Public License for more details.                        *)
+(*                                                                     *)
+(* You should have received a copy of the GNU General Public License   *)
+(* along with Heptagon.  If not, see <http://www.gnu.org/licenses/>    *)
+(*                                                                     *)
+(***********************************************************************)
 open Ocamlbuild_plugin
 open Ocamlbuild_plugin.Options
+open Myocamlbuild_config
 
 let df = function
-  | After_rules ->
-      (* Tell ocamlbuild about Menhir library (needed by --table). *)
-      ocaml_lib ~extern:true ~dir:"+menhirLib" "menhirLib";
-
-      (* Menhir does not come with menhirLib.cmxa so we have to manually by-pass
-         OCamlbuild's built-in logic and add the needed menhirLib.cmxa. *)
-      flag ["link"; "native"; "link_menhirLib"] (S [A "-I"; A "+menhirLib";
-                                                    A "menhirLib.cmx"]);
-      flag ["link"; "byte"; "link_menhirLib"] (S [A "-I"; A "+menhirLib";
-                                                  A "menhirLib.cmo"]);
-
-      flag ["ocaml"; "parser" ; "menhir" ; "use_menhir"] (S[A"--explain";
-                                                            A"--table"]);
-
-      flag ["ocaml"; "compile" ] (S[A"-w"; A"Ae"; A"-warn-error"; A"PU"]);
-
-      (* Tell ocamlbuild about the ocamlgraph library. *)
-      ocaml_lib ~extern:true ~dir:"+ocamlgraph" "graph"
+  | Before_options ->  ocamlfind_before_options ()
+  | After_rules -> ocamlfind_after_rules ();
 
   | _ -> ()
 
