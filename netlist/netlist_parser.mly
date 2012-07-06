@@ -18,9 +18,6 @@
      | [] -> Format.eprintf "Empty list@."; raise Parsing.Parse_error
      | [b] -> VBit b
      | bl -> VBitArray (List.rev bl)
-
- let env_of_vars l =
-   List.fold_left (fun env (x, ty) -> Env.add x ty env) Env.empty l
 %}
 
 %token <int> INT
@@ -36,7 +33,7 @@
 %%
 program:
   VAR vars=separated_list(COMMA, var) IN eqs=list(equ) EOF
-    { { p_eqs = eqs; p_vars = env_of_vars vars } }
+    { { p_eqs = eqs; p_vars = Env.of_list vars } }
 
 equ:
   x=NAME EQUAL e=exp { (x, e) }

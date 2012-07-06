@@ -49,11 +49,11 @@ let lexbuf_from_file file_name =
 let compile_impl filename =
   (* input and output files *)
   let ic, lexbuf = lexbuf_from_file filename in
-  let oo_name = (Filename.chop_suffix filename ".ept") ^ ".oo" in
-  let oo = open_out oo_name in
+  let net_name = (Filename.chop_suffix filename ".ept") ^ ".net" in
+  let net = open_out net_name in
   let close_all_files () =
     close_in ic;
-    close_out oo
+    close_out net
   in
   try
     base_path := Filename.dirname filename;
@@ -72,11 +72,10 @@ let compile_impl filename =
 
     let p = pass "Simplify" true Simplify.program p pp in
 
-    let p = pass "Causality" true Causality.program p pp in
+   (* let p = pass "Causality" true Causality.program p pp in *)
 
-    let p = Oct2sim.program p in
-    (* Write the result of compilation to a binary file *)
-    output_value oo p;
+    let p = Oct2net.program p in
+    Netlist_printer.print_program net p;
 
     close_all_files ()
   with

@@ -65,6 +65,10 @@ let rec find_local_vars b = match b with
 (** Substitutes idents with new names, static params with their values *)
 module Subst =
 struct
+  let do_subst_ty m ty = match ty with
+    | TBitArray se -> TBitArray (simplify m se)
+    | ty -> ty
+
   let do_subst_op m op = match op with
     | OSelect se -> OSelect (simplify m se)
     | OSlice (idx1, idx2) ->
@@ -83,16 +87,20 @@ struct
         | Evarpat id -> Evarpat (translate_ident id)
         | Etuplepat ids -> Etuplepat (List.map translate_ident ids)
 
-  let rec do_subst_exp m subst e = match e.e_desc with
-    | Evar x ->
-        if IdentEnv.mem x subst then
-          IdentEnv.find x subst
-        else
-          e
-    | Eapp(op, args) ->
-        { e with e_desc = Eapp(do_subst_op m op,
-                              List.map (do_subst_exp m subst) args) }
-    | Econst _ -> e
+  let rec do_subst_exp m subst e =
+    let e =
+      match e.e_desc with
+        | Evar x ->
+            if IdentEnv.mem x subst then
+              IdentEnv.find x subst
+            else
+              e
+        | Eapp(op, args) ->
+            { e with e_desc = Eapp(do_subst_op m op,
+                                  List.map (do_subst_exp m subst) args) }
+        | Econst _ -> e
+    in
+     { e with e_ty = do_subst_ty m e.e_ty }
 
   let do_subst_eq m subst (pat, e) =
     (do_subst_pat subst pat, do_subst_exp m subst e)
@@ -151,7 +159,7 @@ and translate_eq m subst call_stack acc ((pat, e) as eq) =
     | Eapp(OCall(f, params), args) ->
         (try
             let n = find_node f in
-              if n.n_inlined = Inlined then
+              if not !Cli_options.no_inline_all or n.n_inlined = Inlined then
                 let b, call_stack = inline_node e.e_loc m call_stack f [] args pat in
                   (translate_block m subst call_stack b)@acc
               else
@@ -204,7 +212,19 @@ let build_cd env cd =
 let program p =
   nodes_list := p.p_nodes;
   let m = List.fold_left build_cd NameEnv.empty p.p_consts in
-  (* Find the nodes without static parameters *)
-  let nodes = List.filter (fun n -> Misc.is_empty n.n_params) p.p_nodes in
-  let nodes = List.map (fun n -> node m n) nodes in
+  if !Cli_options.no_inline_all then (
+    (* Find the nodes without static parameters *)
+    let nodes = List.filter (fun n -> Misc.is_empty n.n_params) p.p_nodes in
+    let nodes = List.map (fun n -> node m n) nodes in
     { p with p_nodes = nodes }
+  ) else (
+    try
+      let n = List.find (fun n -> n.n_name = !Cli_options.main_node) p.p_nodes in
+      if n.n_params <> [] then (
+        Format.eprintf "Error: the main node '%s' cannot have static parameters@." n.n_name;
+        exit 2
+      );
+      { p with p_nodes = [node m n] }
+    with Not_found ->
+      Format.eprintf "Error: Cannot find the main node '%s'@." !Cli_options.main_node; exit 2
+  )

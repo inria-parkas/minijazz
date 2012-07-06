@@ -25,6 +25,7 @@ List.iter (fun (str,tok) -> Hashtbl.add keyword_table str tok) [
  "const", CONST;
  "and", AND;
  "nand", NAND;
+ "or", OR;
  "xor", XOR;
  "if", IF;
  "then", THEN;

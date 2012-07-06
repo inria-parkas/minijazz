@@ -1,9 +1,14 @@
 type ident = string
 
-module Env = Map.Make(struct
-  type t = ident
-  let compare = compare
-end)
+module Env = struct
+  include Map.Make(struct
+    type t = ident
+    let compare = compare
+  end)
+
+  let of_list l =
+    List.fold_left (fun env (x, ty) -> add x ty env) empty l
+end
 
 type ty = TBit | TBitArray of int
 type value = VBit of bool | VBitArray of bool list
