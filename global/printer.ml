@@ -71,10 +71,10 @@ let print_op ff op = match op with
   | OSelect _ | OSlice _ | OConcat -> assert false
 
 let rec print_exp ff e =
-  (*if print_types then
-      fprintf ff "%a : %a" print_edesc e.e_desc print_
-    else*)
-  fprintf ff "%a" print_edesc e.e_desc
+  if !Cli_options.print_types then
+    fprintf ff "(%a : %a)" print_edesc e.e_desc print_type e.e_ty
+  else
+    fprintf ff "%a" print_edesc e.e_desc
 
 and print_edesc ff ed = match ed with
   | Econst v -> print_const ff v

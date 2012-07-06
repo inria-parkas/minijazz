@@ -20,7 +20,7 @@ type arg =
     | Aconst of value
 
 type exp =
-    | Econst of value
+    | Earg of arg
     | Ereg of ident
     | Enot of arg
     | Ebinop of binop * arg * arg

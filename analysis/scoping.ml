@@ -87,5 +87,5 @@ let build_cd env cd =
 
 let program p =
   let consts, env = Misc.mapfold build_cd NameEnv.empty p.p_consts in
-    { p with p_consts = consts; p_nodes = List.map (node env) p.p_nodes }
+    { p_consts = consts; p_nodes = List.map (node env) p.p_nodes }
 

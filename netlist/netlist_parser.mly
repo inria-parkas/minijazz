@@ -39,7 +39,7 @@ equ:
   x=NAME EQUAL e=exp { (x, e) }
 
 exp:
-  | n=INT { Econst (value_of_int n) }
+  | a=arg { Earg a }
   | NOT x=arg { Enot x }
   | REG x=NAME { Ereg x }
   | AND x=arg y=arg { Ebinop(And, x, y) }

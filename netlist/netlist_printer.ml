@@ -37,7 +37,7 @@ let print_op ff op = match op with
   | Xor -> fprintf ff "XOR"
 
 let print_exp ff e = match e with
-  | Econst v -> print_value ff v
+  | Earg a -> print_arg ff a
   | Ereg x -> fprintf ff "REG %s" x
   | Enot x -> fprintf ff "NOT %a" print_arg x
   | Ebinop(op, x, y) -> fprintf ff  "%a %a %a" print_op op  print_arg x  print_arg y
@@ -55,7 +55,7 @@ let print_eq ff (x, e) =
   fprintf ff "%s = %a@." x print_exp e
 
 let print_var ff (x, ty) =
-  fprintf ff "%s%a" x print_ty ty
+  fprintf ff "@[%s%a@]" x print_ty ty
 
 let print_vars ff env =
   fprintf ff "@[<v 2>VAR@,%a@]@.IN@,"

@@ -187,11 +187,9 @@ let solve_constr params cl =
     match res with
       | None -> cl
       | Some (s, se) ->
-          Format.eprintf "Adding def of %s to env@." s;
-        env := NameEnv.add s se !env;
-        Format.eprintf "hhhhh= %d@." (NameEnv.cardinal !env);
-        let cl = List.map (subst_and_error !env) cl in
-        solve_one cl
+          env := NameEnv.add s se !env;
+          let cl = List.map (subst_and_error !env) cl in
+          solve_one cl
   in
   let cl = solve_one cl in
   cl, !env
@@ -325,7 +323,7 @@ let rec type_block env b = match b with
     BIf(se, trueb, falseb)
 
 let ty_repr_block env b =
-  let static_exp funs acc se = Format.eprintf "Subst %a to %a@." Printer.print_static_exp se  Printer.print_static_exp (subst env se); subst env se, acc in
+  let static_exp funs acc se = subst env se, acc in
   let ty funs acc ty =
     let ty = ty_repr ty in
     (* go through types to substitute static exps *)

@@ -89,8 +89,8 @@ type program = {
 }
 
 
-let mk_exp ?(loc = no_location) desc =
-  { e_desc = desc; e_loc = loc; e_ty = invalid_type}
+let mk_exp ?(loc = no_location) ?(ty = invalid_type) desc =
+  { e_desc = desc; e_loc = loc; e_ty = ty }
 
 let mk_const_dec ?(loc = no_location) n se =
   { c_name = n; c_loc = loc; c_value = se }
