@@ -14,20 +14,18 @@ let comment_depth = ref 0
 let keyword_table = ((Hashtbl.create 149) : (string, token) Hashtbl.t);;
 
 List.iter (fun (str,tok) -> Hashtbl.add keyword_table str tok) [
- "node", NODE;
  "ram", RAM;
  "rom", ROM;
  "where", WHERE;
+ "end", END;
  "true", BOOL(true);
  "false", BOOL(false);
  "reg", REG;
- "or", OR;
  "not", NOT;
  "const", CONST;
  "and", AND;
  "nand", NAND;
  "xor", XOR;
- "mux", MUX;
  "if", IF;
  "then", THEN;
  "else", ELSE;
@@ -96,6 +94,7 @@ rule token = parse
   | ")"             { RPAREN }
   | "*"             { STAR }
   | "+"             { PLUS }
+  | "&"             { AND }
   | "/"             { SLASH }
   | "<"             { LESS }
   | ">"             { GREATER }

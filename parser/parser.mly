@@ -7,8 +7,8 @@ open Misc
 
 %}
 
-%token INLINED NODE ROM RAM WHERE CONST PROBING
-%token LPAREN RPAREN MUX COLON COMMA EQUAL REG OR XOR NAND AND POWER SLASH
+%token INLINED ROM RAM WHERE END CONST PROBING
+%token LPAREN RPAREN COLON COMMA EQUAL REG OR XOR NAND AND POWER SLASH
 %token EOF RBRACKET LBRACKET GREATER LESS NOT SEMICOL PLUS MINUS STAR
 %token IF THEN ELSE LEQ DOT DOTDOT
 %token <string> NAME
@@ -17,12 +17,13 @@ open Misc
 %token <string> BOOL_INT
 %token <bool> BOOL
 
-%left OR
-%left EQUAL
-%right PLUS MINUS
+%left DOT
+%left OR PLUS
+%left LEQ EQUAL
+%right MINUS
 %left NAND XOR AND
-%left STAR
-%right REG
+%left STAR SLASH
+%right NOT
 %right POWER
 
 %start program
@@ -34,7 +35,7 @@ open Misc
 %inline slist(S, x)        : l=separated_list(S, x)                    {l}
 %inline snlist(S, x)       : l=separated_nonempty_list(S, x)           {l}
 %inline tuple(x)           : LPAREN h=x COMMA t=snlist(COMMA,x) RPAREN { h::t }
-%inline option(P,x):
+%inline tag_option(P,x):
   |/* empty */    { None }
   | P v=x         { Some(v) }
 
@@ -46,7 +47,7 @@ program:
 
 const_decs: c=list(const_dec) {c}
 const_dec:
-  | CONST n=name EQUAL se=static_exp
+  | CONST n=name EQUAL se=static_exp option(SEMICOL)
       { mk_const_dec ~loc:(Loc($startpos,$endpos)) n se }
 
 name: n=NAME { n }
@@ -55,9 +56,13 @@ type_ident: LBRACKET se=static_exp RBRACKET { TBitArray se }
 
 node_decs: ns=list(node_dec) { ns }
 node_dec:
-  inlined=inlined_status NODE n=name p=params LPAREN args=args RPAREN
-  EQUAL LPAREN out=args RPAREN WHERE b=block probes=probe_decls
+  inlined=inlined_status n=name p=params LPAREN args=args RPAREN
+  EQUAL out=node_out WHERE b=block probes=probe_decls END WHERE option(SEMICOL)
       { mk_node n (Loc ($startpos,$endpos)) inlined args out p b probes }
+
+node_out:
+  | a=arg { [a] }
+  | LPAREN out=args RPAREN { out }
 
 inlined_status:
   | INLINED { Inlined }
@@ -78,9 +83,13 @@ arg:
 
 block:
   | eqs=equs { BEqs (eqs, []) }
-  | IF se=static_exp THEN thenb=block ELSE elseb=block { BIf(se, thenb, elseb) }
+  | IF se=static_exp THEN thenb=block ELSE elseb=block END IF { BIf(se, thenb, elseb) }
 
-equs: e=slist(SEMICOL, equ) { e }
+equs: eq=equ tl=equ_tail { eq::tl }
+equ_tail:
+  | /*empty*/ { [] }
+  | SEMICOL { [] }
+  | SEMICOL eq=equ tl=equ_tail { eq::tl }
 equ: p=pat EQUAL e=exp { mk_equation p e }
 
 pat:
@@ -105,39 +114,44 @@ exps: LPAREN e=slist(COMMA, exp) RPAREN {e}
 
 exp: e=_exp { mk_exp ~loc:(Loc ($startpos,$endpos)) e }
 _exp:
-  | n=NAME                    { Evar n }
-  | LPAREN e=_exp RPAREN      { e }
+  | e=_simple_exp  { e }
   | c=const                   { Econst c }
   | op=op a=exps              { Eapp(op, a) }
-  | e1=exp op=infix_prim e2=exp { Eapp(OCall (op, []), [e1; e2])}
-  | op=prefix_prim a=exp     { Eapp(OCall (op, []), [a])}
-  | MUX ce=exp THEN fe=exp ELSE te=exp { Eapp(OCall ("mux", []), [ce; fe; te]) }
+  | e1=exp PLUS e2=exp { Eapp(OCall ("or", []), [e1; e2])}
+  | e1=exp OR e2=exp { Eapp(OCall ("or", []), [e1; e2])}
+  | e1=exp AND e2=exp { Eapp(OCall ("and", []), [e1; e2])}
+  | e1=exp POWER e2=exp { Eapp(OCall ("xor", []), [e1; e2])}
+  | e1=exp XOR e2=exp { Eapp(OCall ("xor", []), [e1; e2])}
+  | e1=exp NAND e2=exp { Eapp(OCall ("nand", []), [e1; e2])}
+  | NOT a=exp     { Eapp(OCall ("not", []), [a])}
   | e1=exp DOT e2=exp               { Eapp(OConcat, [e1; e2]) }
-  | e1=exp LBRACKET idx=static_exp RBRACKET { Eapp(OSelect idx, [e1]) }
-  | e1=exp LBRACKET low=static_exp DOTDOT high=static_exp RBRACKET
+  | e1=simple_exp LBRACKET idx=static_exp RBRACKET { Eapp(OSelect idx, [e1]) }
+  | e1=simple_exp LBRACKET low=static_exp DOTDOT high=static_exp RBRACKET
     { Eapp(OSlice(low, high), [e1]) }
+
+simple_exp: e=_simple_exp { mk_exp ~loc:(Loc ($startpos,$endpos)) e }
+_simple_exp:
+  | n=NAME                    { Evar n }
+  | LPAREN e=_exp RPAREN      { e }
 
 const:
   | b=BOOL { VBit b }
   | b=BOOL_INT { VBitArray (bool_array_of_string b) }
+  | i=INT
+    { match i with
+      | 0 -> VBit false
+      | 1 -> VBit true
+      | _ -> raise Parsing.Parse_error
+    }
 
 rom_or_ram :
   | ROM { MRom }
   | RAM { MRam }
 
-infix_prim:
-  | OR { "or" }
-  | AND { "and" }
-  | XOR { "xor" }
-  | NAND { "nand" }
-
-prefix_prim:
-  | NOT { "not" }
-
 op:
   | REG { OReg }
   | ro=rom_or_ram LESS addr_size=static_exp
-    COMMA word_size=static_exp input_file=option(COMMA, STRING) GREATER
+    COMMA word_size=static_exp input_file=tag_option(COMMA, STRING) GREATER
     { OMem(ro, addr_size, word_size, input_file) }
   | n=NAME p=call_params { OCall (n,p) }
 

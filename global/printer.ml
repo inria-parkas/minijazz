@@ -149,7 +149,7 @@ let print_params ff params = match params with
   | _ -> print_list_r print_param "<<"","">>" ff params
 
 let print_node ff n =
-  fprintf ff "@[<v2>@[node %a%a%a = %a@] where@ %a@]@\n@."
+  fprintf ff "@[<v2>@[%a%a%a = %a@] where@ %a@.end where;@]@\n@."
     print_name n.n_name
     print_params n.n_params
     print_var_decs n.n_inputs
