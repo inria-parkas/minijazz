@@ -3,6 +3,7 @@ open Static
 open Printer
 open Errors
 open Misc
+open Mapfold
 
 exception Unify
 
@@ -180,16 +181,20 @@ let solve_constr params cl =
       | SBool false -> error (Static_constraint_false c)
       | c -> c
   in
+  let env = ref NameEnv.empty in
   let rec solve_one cl =
     let res, cl = find_simplification cl in
     match res with
       | None -> cl
       | Some (s, se) ->
-        let env = NameEnv.add s se NameEnv.empty in
-        let cl = List.map (subst_and_error env) cl in
+          Format.eprintf "Adding def of %s to env@." s;
+        env := NameEnv.add s se !env;
+        Format.eprintf "hhhhh= %d@." (NameEnv.cardinal !env);
+        let cl = List.map (subst_and_error !env) cl in
         solve_one cl
   in
-  solve_one cl
+  let cl = solve_one cl in
+  cl, !env
 
 let subst_from_condition se = match se with
   | SBinOp(SEqual, SVar n, se1) | SBinOp(SEqual, se1, SVar n) ->
@@ -319,15 +324,16 @@ let rec type_block env b = match b with
     let trueb = type_block new_env trueb in
     BIf(se, trueb, falseb)
 
-(* Recursively replace type variables with their values *)
-let rec repr_ty_block b = match b with
-  | BEqs(eqs, vds) ->
-    let vds = List.map (fun vd -> { vd with v_ty = ty_repr vd.v_ty }) vds in
-    BEqs(eqs,vds)
-  | BIf(e, trueb, falseb) ->
-    let trueb = repr_ty_block trueb in
-    let falseb = repr_ty_block falseb in
-    BIf(e, trueb, falseb)
+let ty_repr_block env b =
+  let static_exp funs acc se = Format.eprintf "Subst %a to %a@." Printer.print_static_exp se  Printer.print_static_exp (subst env se); subst env se, acc in
+  let ty funs acc ty =
+    let ty = ty_repr ty in
+    (* go through types to substitute static exps *)
+    Mapfold.ty funs acc ty
+  in
+  let funs = { Mapfold.defaults with ty = ty; static_exp = static_exp } in
+  let b, _ = Mapfold.block_it funs () b in
+  b
 
 let node n =
   try
@@ -335,9 +341,9 @@ let node n =
     let env = build IdentEnv.empty n.n_inputs in
     let env = build env n.n_outputs in
     let body = type_block env n.n_body in
-    let body = repr_ty_block body in
     let constr = get_constraints () in
-    let constr = solve_constr n.n_params constr in
+    let constr, env = solve_constr n.n_params constr in
+    let body = ty_repr_block env body in
     Modules.add_node n constr;
     { n with n_body = body; n_constraints = constr }
   with
