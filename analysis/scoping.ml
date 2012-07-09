@@ -1,91 +1,74 @@
 open Ast
+open Mapfold
 open Static
 open Location
 open Errors
 
-(** Checks that names used in a node are defined.
-    Adds local vars to node.n_locals.
-    Also simplifies static exp when possible. *)
-
-exception Unbound_identifier of ident
-
-let defnames = ref IdentSet.empty
-let add_defname id =
-  defnames := IdentSet.add id !defnames
-let reset_defnames () =
-  defnames := IdentSet.empty
-
-let simplify_ty env ty = match ty with
-  | TBitArray se -> TBitArray (simplify env se)
-  | _ -> ty
-
-let simplify_vd env vd =
-  { vd with v_ty = simplify_ty env vd.v_ty }
-
-let rec check_exp const_env env e = match e.e_desc with
-  | Evar id ->
-    if not (IdentEnv.mem id env) then
-      raise (Unbound_identifier id)
-  | Eapp(_, args) -> List.iter (check_exp const_env env) args
-  | _ -> ()
-
-let pat_vars env l pat =
-  let add_id env l id =
-    add_defname id;
-    if not (IdentEnv.mem id env) then
-      (mk_var_dec id invalid_type)::l
-    else
-      l
+(** Simplifies static expression in the program. *)
+let simplify_program p =
+  let const_dec funs cenv cd =
+    let v = simplify cenv cd.c_value in
+    let cenv = NameEnv.add cd.c_name v cenv in
+    { cd with c_value = v }, cenv
   in
-  match pat with
-    | Evarpat id -> add_id env l id
-    | Etuplepat ids -> List.fold_left (add_id env) l ids
-
-let build_vd env vd = IdentEnv.add vd.v_ident vd env
-
-let rec block const_env env b = match b with
-  | BEqs (eqs, _) ->
-      let locals = List.fold_left (fun l (pat, _) -> pat_vars env l pat) [] eqs in
-      let env = List.fold_left build_vd env locals in
-        (* check names in equations *)
-        List.iter (fun (_, e) -> check_exp const_env env e) eqs;
-        BEqs (eqs, locals)
-  | BIf(se, trueb, elseb) ->
-     BIf(simplify const_env se, block const_env env trueb,
-        block const_env env elseb)
-
-let node const_env n =
-  let env = List.fold_left build_vd IdentEnv.empty n.n_inputs in
-  let env =  List.fold_left build_vd env n.n_outputs in
-    Modules.add_node n;
-  (*simplify static exps in inputs/outputs types*)
-  reset_defnames ();
-  let body =
-    try
-      block const_env env n.n_body
-    with
-      | Unbound_identifier id ->
-        Format.eprintf "%aThe identifier '%s' is unbound@." print_location n.n_loc  id;
-        raise Error
+  let static_exp funs cenv se =
+    simplify cenv se, cenv
   in
-  let undefined_outputs =
-    List.filter (fun vd -> not (IdentSet.mem vd.v_ident !defnames)) n.n_outputs in
-  if undefined_outputs <> [] then (
-    Format.eprintf "%aThe following outputs are not defined: %a@."
-      print_location n.n_loc  Printer.print_var_decs undefined_outputs;
-    raise Error);
-  { n with
-    n_body = body;
-    n_inputs = List.map (simplify_vd const_env) n.n_inputs;
-    n_outputs = List.map (simplify_vd const_env) n.n_outputs }
+  let funs = { Mapfold.defaults with const_dec = const_dec; static_exp = static_exp } in
+  let p, _ = Mapfold.program_it funs NameEnv.empty p in
+  p
 
+(** Checks the name used in the program are defined.
+    Adds var_decs for all variables defined in a block. *)
+let check_names p =
+  let rec pat_vars s pat = match pat with
+    | Evarpat id -> IdentSet.add id s
+    | Etuplepat ids -> List.fold_left (fun s id -> IdentSet.add id s) s ids
+  in
+  let build_set vds =
+    List.fold_left (fun s vd -> IdentSet.add vd.v_ident s) IdentSet.empty vds
+  in
+  let block funs (s, _) b = match b with
+    | BEqs(eqs, _) ->
+        let defnames = List.fold_left (fun s (pat, _) -> pat_vars s pat) IdentSet.empty eqs in
+        let ls = IdentSet.diff defnames s in (* remove outputs from the set *)
+        let vds = IdentSet.fold (fun id l -> (mk_var_dec id invalid_type)::l) ls [] in
+        let new_s = IdentSet.union s defnames in
+        let eqs,_ = Misc.mapfold (Mapfold.equation_it funs) (new_s, IdentSet.empty) eqs in
+        BEqs (eqs, vds), (s, defnames)
+    | BIf(se, trueb, falseb) ->
+        let trueb, (_, def_true) = Mapfold.block_it funs (s, IdentSet.empty) trueb in
+        let falseb, (_, def_false) = Mapfold.block_it funs (s, IdentSet.empty) falseb in
+        let defnames = IdentSet.inter def_true def_false in
+        BIf(se, trueb, falseb), (s, defnames)
+  in
+  let exp funs (s, defnames) e = match e.e_desc with
+    | Evar id ->
+        if not (IdentSet.mem id s) then (
+          Format.eprintf "%aThe identifier '%s' is unbound@." print_location e.e_loc  id;
+          raise Error
+        );
+        e, (s, defnames)
+    | _ -> Mapfold.exp funs (s, defnames) e
+  in
+  let node n =
+    let funs = { Mapfold.defaults with block = block; exp = exp } in
+    let s = build_set (n.n_inputs@n.n_outputs) in
+    let n_body, (_, defnames) = Mapfold.block_it funs (s, IdentSet.empty) n.n_body in
+    (* check for undefined outputs *)
+    let undefined_outputs =
+      List.filter (fun vd -> not (IdentSet.mem vd.v_ident defnames)) n.n_outputs
+    in
+    if undefined_outputs <> [] then (
+      Format.eprintf "%aThe following outputs are not defined: %a@."
+        print_location n.n_loc  Printer.print_var_decs undefined_outputs;
+      raise Error
+    );
+    { n with n_body = n_body }
+  in
+  { p with p_nodes = List.map node p.p_nodes }
 
-let build_cd env cd =
-  let v = simplify env cd.c_value in
-  let env = NameEnv.add cd.c_name v env in
-    { cd with c_value = v }, env
 
 let program p =
-  let consts, env = Misc.mapfold build_cd NameEnv.empty p.p_consts in
-    { p_consts = consts; p_nodes = List.map (node env) p.p_nodes }
-
+  let p = simplify_program p in
+  check_names p

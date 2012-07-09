@@ -1,13 +1,8 @@
 open Ast
 open Static
+open Misc
 
 exception Fallback
-
-let mapfold f acc l =
-  let l,acc = List.fold_left
-                (fun (l,acc) e -> let e,acc = f acc e in e::l, acc)
-                ([],acc) l in
-  List.rev l, acc
 
 type 'a it_funs = {
   static_exp : 'a it_funs -> 'a -> static_exp -> static_exp * 'a;
@@ -15,9 +10,9 @@ type 'a it_funs = {
   link : 'a it_funs -> 'a -> link -> link * 'a;
   edesc : 'a it_funs -> 'a -> edesc -> edesc * 'a;
   exp : 'a it_funs -> 'a -> exp -> exp * 'a;
+  pat : 'a it_funs -> 'a -> pat -> pat * 'a;
   equation : 'a it_funs -> 'a -> equation -> equation * 'a;
   var_dec : 'a it_funs -> 'a -> var_dec -> var_dec * 'a;
-  op : 'a it_funs -> 'a -> op -> op * 'a;
   block : 'a it_funs -> 'a -> block -> block * 'a;
   node_dec : 'a it_funs -> 'a -> node_dec -> node_dec * 'a;
   const_dec : 'a it_funs -> 'a -> const_dec -> const_dec * 'a;
@@ -36,30 +31,18 @@ and edesc_it funs acc ed =
 and edesc funs acc ed = match ed with
   | Econst v -> Econst v, acc
   | Evar id -> Evar id, acc
-  | Eapp(op, args) ->
-      let op, acc = op_it funs acc op in
-      let args, acc = mapfold (exp_it funs) acc args in
-      Eapp(op, args), acc
-
-and op_it funs acc ed =
-  try funs.op funs acc ed
-  with Fallback -> op funs acc ed
-and op funs acc op = match op with
-  | OMem(k, addr_size, word_size, s) ->
+  | Ereg e ->
+      let e, acc = exp_it funs acc e in
+      Ereg e, acc
+  | Emem(k, addr_size, word_size, s, args) ->
       let addr_size, acc = static_exp_it funs acc addr_size in
       let word_size, acc = static_exp_it funs acc word_size in
-      OMem(k, addr_size, word_size, s), acc
-  | OCall(id, params) ->
+      let args, acc = mapfold (exp_it funs) acc args in
+      Emem(k, addr_size, word_size, s, args), acc
+  | Ecall(id, params, args) ->
       let params, acc = mapfold (static_exp_it funs) acc params in
-      OCall(id, params), acc
-  | OSelect idx ->
-      let idx, acc = static_exp_it funs acc idx in
-      OSelect idx, acc
-  | OSlice (min, max) ->
-      let min, acc = static_exp_it funs acc min in
-      let max, acc = static_exp_it funs acc max in
-      OSlice (min, max), acc
-  | _ -> op, acc
+      let args, acc = mapfold (exp_it funs) acc args in
+      Ecall(id, params, args), acc
 
 and static_exp_it funs acc sd =
   try funs.static_exp funs acc sd
@@ -95,8 +78,14 @@ and link funs acc l = match l with
       let ty, acc = ty_it funs acc ty in
       TLink ty, acc
 
+and pat_it funs acc p =
+  try funs.pat funs acc p
+  with Fallback -> pat funs acc p
+and pat funs acc p = p, acc
+
 and equation_it funs acc eq = funs.equation funs acc eq
 and equation funs acc (pat, e) =
+  let pat, acc = pat_it funs acc pat in
   let e, acc = exp_it funs acc e in
   (pat, e), acc
 
@@ -152,9 +141,9 @@ let defaults = {
   link = link;
   edesc = edesc;
   exp = exp;
+  pat = pat;
   equation = equation;
   var_dec = var_dec;
-  op = op;
   block = block;
   node_dec = node_dec;
   const_dec = const_dec;

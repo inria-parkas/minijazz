@@ -58,18 +58,6 @@ let print_call_params ff params = match params with
   | [] -> ()
   | _ -> print_list_r print_static_exp "<<"","">>" ff params
 
-let print_op ff op = match op with
-  | OReg -> fprintf ff "reg"
-  | OMem(MRom, addr_size, word_size, _) ->
-    fprintf ff "rom<%a,%a>"
-      print_static_exp addr_size  print_static_exp word_size
-  | OMem(MRam, addr_size, word_size, _) ->
-    fprintf ff "ram<%a,%a>"
-      print_static_exp addr_size  print_static_exp word_size
-  | OCall (fn, params) ->
-      fprintf ff "%a%a"  print_name fn  print_call_params params
-  | OSelect _ | OSlice _ | OConcat -> assert false
-
 let rec print_exp ff e =
   if !Cli_options.print_types then
     fprintf ff "(%a : %a)" print_edesc e.e_desc print_type e.e_ty
@@ -79,17 +67,25 @@ let rec print_exp ff e =
 and print_edesc ff ed = match ed with
   | Econst v -> print_const ff v
   | Evar n -> print_ident ff n
-  | Eapp(OSelect idx, args) ->
+  | Ereg e -> fprintf ff "reg %a" print_exp e
+  | Ecall("select", idx::_, args) ->
       let e1 = assert_1 args in
         fprintf ff "%a[%a]" print_exp e1  print_static_exp idx
-  | Eapp(OSlice(low, high), args) ->
+  | Ecall("slice", low::high::_, args) ->
       let e1 = assert_1 args in
         fprintf ff "%a[%a..%a]"
           print_exp e1  print_static_exp low  print_static_exp high
-  | Eapp(OConcat, args) ->
+  | Ecall("concat", _, args) ->
       let e1, e2 = assert_2 args in
         fprintf ff "%a . %a" print_exp e1  print_exp e2
-  | Eapp(op, args) -> fprintf ff "%a%a" print_op op  print_args args
+  | Ecall(fn, params, args) ->
+      fprintf ff "%a%a%a" print_name fn  print_call_params params  print_args args
+  | Emem(MRom, addr_size, word_size, _, args) ->
+      fprintf ff "rom<%a,%a>%a"
+        print_static_exp addr_size  print_static_exp word_size  print_args args
+  | Emem(MRam, addr_size, word_size, _, args) ->
+      fprintf ff "ram<%a,%a>%a"
+        print_static_exp addr_size  print_static_exp word_size  print_args args
 
 and print_args ff args =
   print_list_r print_exp "(" "," ")" ff args
@@ -121,10 +117,10 @@ let print_eqs ff eqs =
   print_list_nlr print_eq """;""" ff eqs
 
 let print_var_dec ff vd = match vd.v_ty with
-  | TUnit -> fprintf ff "%a : ." print_name vd.v_ident
-  | TBit -> fprintf ff "%a" print_name vd.v_ident
+  | TUnit -> fprintf ff "@[%a : .@]" print_name vd.v_ident
+  | TBit -> fprintf ff "@[%a@]" print_name vd.v_ident
   | TBitArray se ->
-    fprintf ff "%a : [%a]" print_name vd.v_ident  print_static_exp se
+    fprintf ff "@[%a : [%a]@]" print_name vd.v_ident  print_static_exp se
   | TProd _ -> assert false
   | TVar _ -> fprintf ff "%a : <var>" print_name vd.v_ident
 
@@ -134,7 +130,7 @@ let print_var_decs ff vds =
 let rec print_block ff b = match b with
   | BEqs (eqs, []) -> print_eqs ff eqs
   | BEqs (eqs, vds) ->
-    fprintf ff "var %a in@,%a" print_var_decs vds print_eqs eqs
+    fprintf ff "@[<v 2>var %a@] in@,%a" print_var_decs vds print_eqs eqs
   | BIf(se, thenb, elseb) ->
       fprintf ff "@[<v 2>if %a then@,%a@]@,@[<v 2>else@,%a@]"
         print_static_exp se
@@ -148,13 +144,18 @@ let print_params ff params = match params with
   | [] -> ()
   | _ -> print_list_r print_param "<<"","">>" ff params
 
+let print_constraints ff cl =
+  if !Cli_options.print_types then
+    fprintf ff " with %a" (print_list_r print_static_exp "" " and " "") cl
+
 let print_node ff n =
-  fprintf ff "@[<v2>@[%a%a%a = %a@] where@ %a@.end where;@]@\n@."
+  fprintf ff "@[<v2>@[%a%a%a = %a@] where@ %a@.end where%a;@]@\n@."
     print_name n.n_name
     print_params n.n_params
     print_var_decs n.n_inputs
     print_var_decs n.n_outputs
     print_block n.n_body
+    print_constraints n.n_constraints
 
 let print_const_dec ff cd =
   fprintf ff "const %a = %a@\n@."

@@ -1,37 +1,41 @@
 open Ast
+open Mapfold
 
 let mk_eq e =
+  (* TODO: fonctions avec plusieurs sorties *)
   let id = "_l" ^ (Misc.gen_symbol ()) in
   let eq = (Evarpat id, e) in
-    Evar id, eq
+  let vd = mk_var_dec id e.e_ty in
+  Evar id, vd, eq
 
-let rec mk_simple acc e = match e.e_desc with
-  (*| Eapp ((OSelect _ | OSlice _), _ ) -> e, acc*)
-  | Eapp (op, args) ->
-      let args, acc = Misc.mapfold mk_simple acc args in
-      let desc, eq = mk_eq { e with e_desc = Eapp (op, args) } in
-        { e with e_desc = desc }, eq::acc
-  | _ -> e, acc
+(* Put all the arguments in separate equations *)
+let exp funs (eqs, vds) e = match e.e_desc with
+  | Econst _ | Evar _ -> e, (eqs, vds)
+  | _ ->
+      let e, (eqs, vds) = Mapfold.exp funs (eqs, vds) e in
+      let desc, vd, eq = mk_eq e in
+      { e with e_desc = desc }, (eq::eqs, vd::vds)
 
-let norm_exp acc e = match e.e_desc with
-  | Econst _ | Evar _ -> e, acc
-  | Eapp (op, args) ->
-      let args, acc = Misc.mapfold mk_simple acc args in
-        { e with e_desc = Eapp(op, args) }, acc
+let equation funs (eqs, vds) (pat, e) =
+  match e.e_desc with
+    | Econst _ | Evar _ -> (pat, e), (eqs, vds)
+    | _ ->
+        let _, ((_, e)::eqs, _::vds) = Mapfold.exp_it funs (eqs, vds) e in
+        (pat, e), (eqs, vds)
 
-let norm_eq acc (pat,e) =
-  let e, acc = norm_exp acc e in
-    (pat, e)::acc
-
-let rec block b = match b with
+let block funs acc b = match b with
   | BEqs(eqs, vds) ->
-      let eqs = List.fold_left norm_eq [] eqs in
-        BEqs(eqs, vds)
-  | BIf(se, trueb, elseb) ->
-      BIf(se, block trueb, block elseb)
-
-let node n =
-  { n with n_body = block n.n_body }
+      let eqs, (new_eqs, new_vds) = Misc.mapfold (Mapfold.equation_it funs) ([], []) eqs in
+      BEqs(new_eqs@eqs, new_vds@vds), acc
+  | BIf _ -> raise Mapfold.Fallback
 
 let program p =
-    { p with p_nodes = List.map node p.p_nodes }
+  let funs = { Mapfold.defaults with exp = exp; equation = equation; block = block } in
+  let p, _ = Mapfold.program_it funs ([], []) p in
+  p
+
+(* Used by Callgraph *)
+let block b =
+  let funs = { Mapfold.defaults with exp = exp; equation = equation; block = block } in
+  let b, _ = Mapfold.block_it funs ([], []) b in
+  b

@@ -20,15 +20,6 @@ let invalid_type = TUnit
 
 type mem_kind = MRom | MRam
 
-type op =
-  | OReg
-  | OMem of mem_kind * static_exp * static_exp * string option
-      (* ro * address size * word size * input file *)
-  | OCall of name * static_exp list (*function, params*)
-  | OSelect of static_exp
-  | OSlice of static_exp * static_exp
-  | OConcat
-
 type value =
   | VBit of bool
   | VBitArray of bool array
@@ -36,7 +27,11 @@ type value =
 type edesc =
   | Econst of value
   | Evar of ident
-  | Eapp of op * exp list
+  | Ereg of exp
+  | Ecall of name * static_exp list * exp list
+      (* function * params * args *)
+  | Emem of mem_kind * static_exp * static_exp * string option * exp list
+      (* ro * address size * word size * input file * args *)
 
 and exp = {
   e_desc : edesc;
@@ -110,6 +105,3 @@ let mk_node n loc inlined inputs outputs params b probes =
 
 let mk_program cds nds =
   { p_consts = cds; p_nodes = nds }
-
-
-let unifty t1 t2 = (t1 = t2)

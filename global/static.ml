@@ -36,19 +36,16 @@ let fun_of_comp_op op = match op with
   | SEqual -> (=) | SLeq -> (<=)  | SLess -> (<)
   | _ -> assert false
 
-let rec _simplify is_rec env se = match se with
+let rec simplify env se = match se with
   | SInt _ | SBool _ -> se
   | SVar n ->
       (try
          let se = NameEnv.find n env in
-         if is_rec then
-          _simplify is_rec env se
-         else
-           se
+         simplify env se
         with
           | Not_found -> se)
   | SBinOp(op, se1, se2) ->
-    (match op, _simplify is_rec env se1, _simplify is_rec env se2 with
+    (match op, simplify env se1, simplify env se2 with
       | (SAdd | SMinus | SDiv  | SMult | SPower), SInt i1, SInt i2 ->
           let f = fun_of_op op in
             SInt (f i1 i2)
@@ -57,8 +54,15 @@ let rec _simplify is_rec env se = match se with
             SBool (f i1 i2)
       | _, se1, se2 -> SBinOp(op, se1, se2))
 
-let simplify = _simplify true
-let subst = _simplify false
+let rec subst env se = match se with
+  | SInt _ | SBool _ -> se
+  | SVar n ->
+      (try
+          NameEnv.find n env
+        with
+          | Not_found -> se)
+  | SBinOp(op, se1, se2) ->
+      SBinOp(op, subst env se1, subst env se2)
 
 exception Unsatisfiable of static_exp
 let check_true env cl =

@@ -49,6 +49,32 @@ type signature =
 module Modules = struct
   let env = ref Ast.NameEnv.empty
 
+  let add_sig ?(params = []) ?(constr = []) n inp outp =
+    let s = { s_inputs = inp; s_outputs = outp; s_params = params; s_constraints = constr } in
+    env := Ast.NameEnv.add n s !env
+
+  let _ =
+    add_sig "and" [TBit;TBit] [TBit];
+    add_sig "xor" [TBit;TBit] [TBit];
+    add_sig "or"  [TBit;TBit] [TBit];
+    add_sig "not" [TBit] [TBit];
+    add_sig "reg" [TBit] [TBit];
+    add_sig "mux" [TBit;TBit;TBit] [TBit];
+    add_sig ~params:["n"] "print" [TBitArray (SVar "n"); TBit] [TBit];
+    add_sig ~params:["n"] "input" [TBit] [TBitArray (SVar "n")];
+    add_sig ~params:["i"; "n"] ~constr:[SBinOp(SLeq, SVar "i", SVar "n")]
+      "select" [TBitArray (SVar "n")] [TBit];
+    add_sig ~params:["n1"; "n2"]
+      "concat" [TBitArray (SVar "n1"); TBitArray (SVar "n2")]
+      [TBitArray (SBinOp(SAdd, SVar "n1", SVar "n2"))];
+    (* slice :  size = max - min + 1 *)
+    let size = SBinOp(SAdd, (SBinOp(SMinus, SVar "max", SVar "min")), SInt 1) in
+    let constr1 = SBinOp(SLess, SInt 0, SVar "min") in
+    let constr2 = SBinOp(SLeq, SVar "max", SVar "n") in
+    add_sig ~params:["min"; "max"; "n"] ~constr:[constr1; constr2] "slice"
+      [TBitArray (SVar "n")] [TBitArray size]
+
+
   let tys_of_vds vds = List.map (fun vd -> vd.v_ty) vds
 
   let add_node n constr =
@@ -99,7 +125,6 @@ let fresh_static_var () =
 let fresh_type =
   let index = ref 0 in
   let gen_index () = (incr index; !index) in
-  (** returns a new clock variable *)
   let fresh_type () = TVar (ref (TIndex (gen_index ()))) in
   fresh_type
 
@@ -165,6 +190,14 @@ and expect_static_exp se ty =
   if found_ty <> ty then
     error (Static_type_error (found_ty, ty))
 
+let rec simplify_constr cl = match cl with
+  | [] -> []
+  | c::cl ->
+      match simplify NameEnv.empty c with
+        | SBool true -> simplify_constr cl
+        | SBool false -> error (Static_constraint_false c)
+        | _ -> c::(simplify_constr cl)
+
 let solve_constr params cl =
   let params = List.map (fun p -> p.p_name) params in
   let rec find_simplification cl = match cl with
@@ -191,6 +224,7 @@ let solve_constr params cl =
           let cl = List.map (subst_and_error !env) cl in
           solve_one cl
   in
+  let cl = simplify_constr cl in
   let cl = solve_one cl in
   cl, !env
 
@@ -213,9 +247,30 @@ let rec type_exp env e =
       | Econst (VBit _) -> e.e_desc, TBit
       | Econst (VBitArray a) -> e.e_desc, TBitArray (SInt (Array.length a))
       | Evar id -> Evar id, IdentEnv.find id env
-      | Eapp (op, args) ->
-        let args, ty = type_op env op args in
-        Eapp(op, args), ty
+      | Ereg e ->
+          let e = expect_exp env e TBit in
+          Ereg e, TBit
+      | Emem (MRom, addr_size, word_size, file, args) ->
+          let read_addr = assert_1 args in
+          let read_addr = expect_exp env read_addr (TBitArray addr_size) in
+          Emem (MRom, addr_size, word_size, file, [read_addr]), TBitArray word_size
+      | Emem (MRam, addr_size, word_size, file, args) ->
+          let read_addr, write_en, write_addr, data_in = assert_4 args in
+          let read_addr = expect_exp env read_addr (TBitArray addr_size) in
+          let write_addr = expect_exp env write_addr (TBitArray addr_size) in
+          let data_in = expect_exp env data_in (TBitArray word_size) in
+          let write_en = expect_exp env write_en TBit in
+          let args = [read_addr; write_en; write_addr; data_in] in
+          Emem (MRam, addr_size, word_size, file, args), TBitArray word_size
+      | Ecall (f, params, args) ->
+          let s = Modules.find_node f params in
+          (*check arity*)
+          if List.length s.s_inputs <> List.length args then
+            error (Args_arity_error (List.length args, List.length s.s_inputs));
+          (*check types of all arguments*)
+          let args = List.map2 (expect_exp env) args s.s_inputs in
+          List.iter add_constraint s.s_constraints;
+          Ecall(f, params, args), prod s.s_outputs
     in
     { e with e_desc = desc; e_ty = ty }, ty
   with
@@ -228,72 +283,6 @@ and expect_exp env e ty =
       e
     with
         Unify -> error (Type_error (found_ty, ty))
-
-and type_op env op args = match op with
-  | OReg | OCall ("not", []) ->
-    let e = assert_1 args in
-    let e = expect_exp env e TBit in
-    [e], TBit
-  | OCall ("and", []) | OCall ("xor", []) | OCall ("or", []) ->
-    let e1, e2 = assert_2 args in
-    let e1 = expect_exp env e1 TBit in
-    let e2 = expect_exp env e2 TBit in
-    [e1; e2], TBit
-  | OCall ("mux", []) ->
-    let e1, e2, e3 = assert_3 args in
-    let e1 = expect_exp env e1 TBit in
-    let e2 = expect_exp env e2 TBit in
-    let e3 = expect_exp env e3 TBit in
-    [e1; e2; e3], TBit
-  | OCall ("print", [n]) ->
-      let e1, enable = assert_2 args in
-      let enable = expect_exp env enable TBit in
-      let e1 = expect_exp env e1 (TBitArray n) in
-        [e1; enable], TBit
-  | OCall ("input", [n]) ->
-      let e1 = assert_1 args in
-      let e1 = expect_exp env e1 TBit in
-      [e1], TBitArray n
-  | OSelect i ->
-    let e = assert_1 args in
-    let n = fresh_static_var () in
-    add_constraint (SBinOp(SLeq, i, n)); (* i = n *)
-    let e = expect_exp env e (TBitArray n) in
-    [e], TBit
-  | OConcat ->
-    let e1, e2 = assert_2 args in
-    let n1 = fresh_static_var () in
-    let n2 = fresh_static_var () in
-    let e1 = expect_exp env e1 (TBitArray n1) in
-    let e2 = expect_exp env e2 (TBitArray n2) in
-    [e1; e2], TBitArray (SBinOp(SAdd, n1, n2))
-  | OSlice (i1, i2) ->
-    let e = assert_1 args in
-    let n = fresh_static_var () in
-    let e = expect_exp env e (TBitArray n) in
-    add_constraint (SBinOp(SLess, SInt 0, i1)); (* 0 < i1 *)
-    add_constraint (SBinOp(SLeq, i2, n)); (* i2 <= n *)
-    let size = SBinOp(SAdd, (SBinOp(SMinus, i2, i1)), SInt 1) in (* size = i2 - i1 + 1 *)
-    [e], TBitArray size
-  | OMem (MRom, addr_size, word_size, _) ->
-    let read_addr = assert_1 args in
-    let read_addr = expect_exp env read_addr (TBitArray addr_size) in
-      [read_addr], TBitArray word_size
-  | OMem (MRam, addr_size, word_size, _) ->
-    let read_addr, write_en, write_addr, data_in = assert_4 args in
-    let read_addr = expect_exp env read_addr (TBitArray addr_size) in
-    let write_addr = expect_exp env write_addr (TBitArray addr_size) in
-    let data_in = expect_exp env data_in (TBitArray word_size) in
-    let write_en = expect_exp env write_en TBit in
-      [read_addr; write_en; write_addr; data_in], TBitArray word_size
-  | OCall (f, params) ->
-    let s = Modules.find_node f params in
-    (*check arity*)
-    if List.length s.s_inputs <> List.length args then
-      error (Args_arity_error (List.length args, List.length s.s_inputs));
-    (*check types of all arguments*)
-    let args = List.map2 (expect_exp env) args s.s_inputs in
-      args, prod s.s_outputs
 
 let type_pat env pat = match pat with
   | Evarpat x -> IdentEnv.find x env
@@ -317,7 +306,7 @@ let rec type_block env b = match b with
   | BIf(se, trueb, falseb) ->
     expect_static_exp se STBool;
     let falseb = type_block env falseb in
-    (* Type the true block using the information guven by the condition*)
+    (* Type the true block using the information given by the condition*)
     let new_env = simplify_env (subst_from_condition se) env in
     let trueb = type_block new_env trueb in
     BIf(se, trueb, falseb)

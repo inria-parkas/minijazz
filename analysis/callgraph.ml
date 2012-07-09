@@ -1,4 +1,5 @@
 open Ast
+open Mapfold
 open Static
 open Location
 open Errors
@@ -8,29 +9,16 @@ open Errors
 let expect_bool env se =
   match simplify env se with
     | SBool v -> v
-    | _ ->
-        let ff = Format.formatter_of_out_channel stdout in
-          Printer.print_static_exp ff se; Format.fprintf ff "@.";
-        Format.eprintf "Static instanciation to bool failed@.";
-        NameEnv.iter (fun k _ -> Format.eprintf "%s " k) env;
-        Format.eprintf "is_empty : %b @." (NameEnv.is_empty env);
-        assert false
+    | _ -> Format.eprintf "Expected a boolean@."; raise Error
 
 let expect_int env se =
   match simplify env se with
     | SInt v -> v
-    | _ ->
-        let ff = Format.formatter_of_out_channel stdout in
-          Printer.print_static_exp ff se; Format.fprintf ff "@.";
-          Format.eprintf "Static instanciation to int failed@."; raise Error
+    | _ -> Format.eprintf "Expected an integer@."; raise Error
 
-
-(** Function to create unique names *)
-let used_names = ref IdentSet.empty
-let reset_names () =
-  used_names := IdentSet.empty
-let add_names vds =
-  List.iter (fun vd -> used_names := IdentSet.add vd.v_ident !used_names) vds
+let simplify_ty env ty = match ty with
+  | TBitArray se -> TBitArray (simplify env se)
+  | _ -> ty
 
 (** Find a node by name*)
 let nodes_list = ref []
@@ -73,72 +61,43 @@ let rec find_local_vars b = match b with
   | BIf (_, trueb, falseb) -> (find_local_vars trueb) @ (find_local_vars falseb)
 
 (** Substitutes idents with new names, static params with their values *)
-module Subst =
-struct
-  let do_subst_ty m ty = match ty with
-    | TBitArray se -> TBitArray (simplify m se)
-    | ty -> ty
+let do_subst_block m subst b  =
+  let translate_ident subst id =
+    try
+      ident_of_exp (IdentEnv.find id subst)
+    with
+      | Not_found -> id
+  in
+  let static_exp funs (subst, m) se =
+    simplify m se, (subst, m)
+  in
+  let exp funs (subst, m) e = match e.e_desc with
+    | Evar x ->
+        let e = if IdentEnv.mem x subst then IdentEnv.find x subst else e in
+        e, (subst, m)
+    | _ -> Mapfold.exp funs (subst, m) e
+  in
+  let pat funs (subst, m) pat = match pat with
+    | Evarpat id -> Evarpat (translate_ident subst id), (subst, m)
+    | Etuplepat ids -> Etuplepat (List.map (translate_ident subst) ids), (subst, m)
+  in
+  let var_dec funs (subst, m) vd =
+    (* iterate on the type *)
+    let vd, _ = Mapfold.var_dec funs (subst, m) vd in
+    { vd with v_ident = translate_ident subst vd.v_ident }, (subst, m)
+  in
+  let funs =
+    { Mapfold.defaults with static_exp = static_exp; exp = exp;
+      pat = pat; var_dec = var_dec }
+  in
+  let b, _ = Mapfold.block_it funs (subst, m) b in
+  b
 
-  let do_subst_op m op = match op with
-    | OSelect se -> OSelect (simplify m se)
-    | OSlice (idx1, idx2) ->
-        OSlice (simplify m idx1, simplify m idx2)
-    | OMem(b, se1, se2, file) ->
-        OMem (b, simplify m se1, simplify m se2, file)
-    | OCall(f, params) -> OCall(f, List.map (simplify m) params)
-    | _ -> op
-
-  let do_subst_pat subst pat =
-    let translate_ident id =
-      try ident_of_exp (IdentEnv.find id subst)
-      with | Not_found -> id
-    in
-      match pat with
-        | Evarpat id -> Evarpat (translate_ident id)
-        | Etuplepat ids -> Etuplepat (List.map translate_ident ids)
-
-  let rec do_subst_exp m subst e =
-    let e =
-      match e.e_desc with
-        | Evar x ->
-            if IdentEnv.mem x subst then
-              IdentEnv.find x subst
-            else
-              e
-        | Eapp(op, args) ->
-            { e with e_desc = Eapp(do_subst_op m op,
-                                  List.map (do_subst_exp m subst) args) }
-        | Econst _ -> e
-    in
-     { e with e_ty = do_subst_ty m e.e_ty }
-
-  let do_subst_eq m subst (pat, e) =
-    (do_subst_pat subst pat, do_subst_exp m subst e)
-
-  let do_subst_var_dec m subst vd =
-    let new_id =
-      match (IdentEnv.find vd.v_ident subst).e_desc with
-        | Evar x -> x
-        | _ -> assert false
-    in
-    { v_ident = new_id; v_ty = do_subst_ty m vd.v_ty }
-
-  let rec do_subst_block m subst b = match b with
-    | BEqs (eqs, vds) ->
-        let eqs = List.map (do_subst_eq m subst) eqs in
-        let vds = List.map (do_subst_var_dec m subst) vds in
-          BEqs (eqs, vds)
-    | BIf (se, trueb, falseb) ->
-        let se = simplify m se in
-        let trueb = do_subst_block m subst trueb in
-        let falseb = do_subst_block m subst falseb in
-          BIf(se, trueb, falseb)
-end
-
-let check_params loc param_names params cl =
+let check_params loc m param_names params cl =
   let env = build_params NameEnv.empty param_names params in
+  let cl = List.map (simplify env) cl in
   try
-    check_true env cl
+    check_true m cl
   with Unsatisfiable(c) ->
     Format.eprintf "%aThe following constraint is not satisfied: %a@."
       print_location loc  Printer.print_static_exp c;
@@ -154,55 +113,35 @@ let rec inline_node loc env m call_stack f params args pat =
 
   (* do the actual work *)
   let n = find_node f in
-  check_params loc n.n_params params n.n_constraints;
+  check_params loc m n.n_params params n.n_constraints;
   let m = build_params m n.n_params params in
   let subst = build_exp IdentEnv.empty n.n_inputs args in
   let subst = build_exp subst n.n_outputs (List.rev (vars_of_pat env pat)) in
   let locals = find_local_vars n.n_body in
   let subst = List.fold_left rename subst locals in
-  let b = Subst.do_subst_block m subst n.n_body in
-  Normalize.block b, call_stack
+  let b = do_subst_block m subst n.n_body in
+  let b = Normalize.block b in
+  b, call_stack
 
 and translate_eq env m subst call_stack (eqs, vds) ((pat, e) as eq) =
-  let (pat, e) = Subst.do_subst_eq m subst eq in
   match e.e_desc with
-    | Eapp(OCall(("print" | "input") as f, params), args) ->
-        let params = List.map (simplify m) params in
-        let e = { e with e_desc =  Eapp(OCall(f, params), args) } in
-          (pat, e)::eqs, vds
-    | Eapp(OCall(f, params), args) when not (Misc.is_empty params) ->
-      let params = List.map (simplify m) params in
-      let b, call_stack = inline_node e.e_loc env m call_stack f params args pat in
-      let new_eqs, new_vds = translate_block env m subst call_stack b in
-      new_eqs@eqs, new_vds@vds
-    (* Inline nodes that were declared inlined *)
-    | Eapp(OCall(f, params), args) ->
+    (* Inline all nodes  or only those with params or declared inline
+       if no_inline_all = true *)
+    | Ecall(f, params, args) ->
         (try
             let n = find_node f in
-              if not !Cli_options.no_inline_all or n.n_inlined = Inlined then
-                let b, call_stack = inline_node e.e_loc env m call_stack f [] args pat in
-                let new_eqs, new_vds = translate_block env m subst call_stack b in
-                new_eqs@eqs, new_vds@vds
-              else
-                eq::eqs, vds
+            if not !Cli_options.no_inline_all
+              || not (Misc.is_empty params)
+              || n.n_inlined = Inlined then
+              let params = List.map (simplify m) params in
+              let b, call_stack = inline_node e.e_loc env m call_stack f params args pat in
+              let new_eqs, new_vds = translate_block env m subst call_stack b in
+              new_eqs@eqs, new_vds@vds
+            else
+              eq::eqs, vds
           with
-              Not_found -> (* Predefined function*)
-                eq::eqs, vds
+            | Not_found -> eq::eqs, vds (* Predefined function*)
         )
-    | Eapp(OMem(mem_kind, addr_size, word_size, f), args) ->
-        let addr_size = simplify m addr_size in
-        let word_size = simplify m word_size in
-        let e = { e with e_desc = Eapp(OMem(mem_kind, addr_size, word_size, f), args) } in
-        (pat, e)::eqs, vds
-    | Eapp(OSlice(i1, i2), args) ->
-        let i1 = simplify m i1 in
-        let i2 = simplify m i2 in
-        let e = { e with e_desc = Eapp(OSlice(i1, i2), args) } in
-        (pat, e)::eqs, vds
-    | Eapp(OSelect i1, args) ->
-        let i1 = simplify m i1 in
-        let e = { e with e_desc = Eapp(OSelect i1, args) } in
-        (pat, e)::eqs, vds
     | _ -> eq::eqs, vds
 
 and translate_eqs env m subst call_stack acc eqs =
@@ -211,6 +150,7 @@ and translate_eqs env m subst call_stack acc eqs =
 and translate_block env m subst call_stack b =
   match b with
     | BEqs (eqs, vds) ->
+        let vds = List.map (fun vd -> { vd with v_ty = simplify_ty m vd.v_ty }) vds in
         let env = build_env env vds in
         translate_eqs env m subst call_stack ([], vds) eqs
     | BIf(se, trueb, elseb) ->
@@ -221,9 +161,6 @@ and translate_block env m subst call_stack b =
 
 let node m n =
   (*Init state*)
-  reset_names ();
-  add_names n.n_inputs;
-  add_names n.n_outputs;
   let call_stack = [(n.n_name, [])] in
   (*Do the translation*)
   let env = build_env IdentEnv.empty n.n_inputs in
@@ -246,10 +183,11 @@ let program p =
     try
       let n = List.find (fun n -> n.n_name = !Cli_options.main_node) p.p_nodes in
       if n.n_params <> [] then (
-        Format.eprintf "Error: the main node '%s' cannot have static parameters@." n.n_name;
-        exit 2
+        Format.eprintf "The main node '%s' cannot have static parameters@." n.n_name;
+        raise Error
       );
       { p with p_nodes = [node m n] }
     with Not_found ->
-      Format.eprintf "Error: Cannot find the main node '%s'@." !Cli_options.main_node; exit 2
+      Format.eprintf "Cannot find the main node '%s'@." !Cli_options.main_node;
+      raise Error
   )

@@ -5,6 +5,9 @@ open Ast
 open Location
 open Misc
 
+let fresh_param () =
+  SVar ("_n"^(Misc.gen_symbol ()))
+
 %}
 
 %token INLINED ROM RAM WHERE END CONST PROBING
@@ -23,7 +26,7 @@ open Misc
 %right MINUS
 %left NAND XOR AND
 %left STAR SLASH
-%right NOT
+%right NOT REG
 %right POWER
 
 %start program
@@ -115,19 +118,25 @@ exps: LPAREN e=slist(COMMA, exp) RPAREN {e}
 exp: e=_exp { mk_exp ~loc:(Loc ($startpos,$endpos)) e }
 _exp:
   | e=_simple_exp  { e }
-  | c=const                   { Econst c }
-  | op=op a=exps              { Eapp(op, a) }
-  | e1=exp PLUS e2=exp { Eapp(OCall ("or", []), [e1; e2])}
-  | e1=exp OR e2=exp { Eapp(OCall ("or", []), [e1; e2])}
-  | e1=exp AND e2=exp { Eapp(OCall ("and", []), [e1; e2])}
-  | e1=exp POWER e2=exp { Eapp(OCall ("xor", []), [e1; e2])}
-  | e1=exp XOR e2=exp { Eapp(OCall ("xor", []), [e1; e2])}
-  | e1=exp NAND e2=exp { Eapp(OCall ("nand", []), [e1; e2])}
-  | NOT a=exp     { Eapp(OCall ("not", []), [a])}
-  | e1=exp DOT e2=exp               { Eapp(OConcat, [e1; e2]) }
-  | e1=simple_exp LBRACKET idx=static_exp RBRACKET { Eapp(OSelect idx, [e1]) }
+  | c=const { Econst c }
+  | REG e=exp { Ereg e }
+  | n=NAME p=call_params a=exps { Ecall (n, p, a) }
+  | e1=exp PLUS e2=exp { Ecall ("or", [], [e1; e2]) }
+  | e1=exp OR e2=exp { Ecall ("or", [], [e1; e2]) }
+  | e1=exp AND e2=exp { Ecall ("and", [], [e1; e2]) }
+  | e1=exp POWER e2=exp { Ecall("xor", [], [e1; e2]) }
+  | e1=exp XOR e2=exp { Ecall ("xor", [], [e1; e2]) }
+  | e1=exp NAND e2=exp { Ecall ("nand", [], [e1; e2]) }
+  | NOT a=exp     { Ecall ("not", [], [a])}
+  | e1=exp DOT e2=exp
+    { Ecall("concat", [fresh_param(); fresh_param()], [e1; e2]) }
+  | e1=simple_exp LBRACKET idx=static_exp RBRACKET
+    { Ecall ("select", [idx; fresh_param()], [e1]) }
   | e1=simple_exp LBRACKET low=static_exp DOTDOT high=static_exp RBRACKET
-    { Eapp(OSlice(low, high), [e1]) }
+    { Ecall("slice", [low; high; fresh_param()], [e1]) }
+  | ro=rom_or_ram LESS addr_size=static_exp
+    COMMA word_size=static_exp input_file=tag_option(COMMA, STRING) GREATER a=exps
+    { Emem(ro, addr_size, word_size, input_file, a) }
 
 simple_exp: e=_simple_exp { mk_exp ~loc:(Loc ($startpos,$endpos)) e }
 _simple_exp:
@@ -147,13 +156,6 @@ const:
 rom_or_ram :
   | ROM { MRom }
   | RAM { MRam }
-
-op:
-  | REG { OReg }
-  | ro=rom_or_ram LESS addr_size=static_exp
-    COMMA word_size=static_exp input_file=tag_option(COMMA, STRING) GREATER
-    { OMem(ro, addr_size, word_size, input_file) }
-  | n=NAME p=call_params { OCall (n,p) }
 
 call_params:
   | /*empty*/ { [] }

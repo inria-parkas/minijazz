@@ -38,14 +38,9 @@ let expect_arg e = match e.e_desc with
 let rec tr_exp e = match e.e_desc with
   | Evar id -> Netlist_ast.Earg (Netlist_ast.Avar id)
   | Econst v ->  Netlist_ast.Earg (Netlist_ast.Aconst (tr_value v))
-  | Eapp(OReg, args) ->
-      let e = Misc.assert_1 args in
-      Netlist_ast.Ereg (expect_ident e)
- | Eapp(OCall ("not", _), args) ->
-      let e = Misc.assert_1 args in
-      Netlist_ast.Enot (expect_arg e)
- | Eapp(OCall (("or" | "xor" | "and" | "nand") as op, _), args) ->
-      let e1, e2 = Misc.assert_2 args in
+  | Ereg e -> Netlist_ast.Ereg (expect_ident e)
+  | Ecall ("not", _, [e]) -> Netlist_ast.Enot (expect_arg e)
+  | Ecall (("or" | "xor" | "and" | "nand") as op, _, [e1; e2]) ->
       let op =
         match op with
           | "or" -> Netlist_ast.Or
@@ -55,23 +50,17 @@ let rec tr_exp e = match e.e_desc with
           | _ -> assert false
       in
       Netlist_ast.Ebinop (op, expect_arg e1, expect_arg e2)
- | Eapp(OCall ("mux", _), args) ->
-      let e1, e2, e3 = Misc.assert_3 args in
+  | Ecall ("mux", _, [e1; e2; e3]) ->
       Netlist_ast.Emux (expect_arg e1, expect_arg e2, expect_arg e3)
-  | Eapp(OSelect idx, args) ->
-      let e = Misc.assert_1 args in
+  | Ecall("select", idx::_, [e]) ->
       Netlist_ast.Eselect (expect_int idx, expect_arg e)
-  | Eapp(OSlice (min, max), args) ->
-      let e = Misc.assert_1 args in
+  | Ecall("slice", min::max::_, [e]) ->
       Netlist_ast.Eslice (expect_int min, expect_int max, expect_arg e)
-  | Eapp(OConcat, args) ->
-      let e1, e2 = Misc.assert_2 args in
+  | Ecall("concat", _, [e1; e2]) ->
       Netlist_ast.Econcat (expect_arg e1, expect_arg e2)
-  | Eapp(OMem(MRom, addr_size, word_size, _), args) ->
-      let e = Misc.assert_1 args in
+  | Emem(MRom, addr_size, word_size, _, [e]) ->
       Netlist_ast.Erom (expect_int addr_size, expect_int word_size, expect_arg e)
-  | Eapp(OMem(MRam, addr_size, word_size, _), args) ->
-      let ra, we, wa, data = Misc.assert_4 args in
+  | Emem(MRam, addr_size, word_size, _, [ra; we; wa; data]) ->
       Netlist_ast.Eram (expect_int addr_size, expect_int word_size,
                        expect_arg ra, expect_arg we, expect_arg wa, expect_arg data)
   | _ -> assert false
