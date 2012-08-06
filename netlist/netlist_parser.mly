@@ -17,14 +17,14 @@
    match aux n with
      | [] -> Format.eprintf "Empty list@."; raise Parsing.Parse_error
      | [b] -> VBit b
-     | bl -> VBitArray (List.rev bl)
+     | bl -> VBitArray (Array.of_list (List.rev bl))
 %}
 
 %token <int> INT
 %token <string> NAME
 %token AND MUX NAND OR RAM ROM XOR REG NOT
 %token CONCAT SELECT SLICE
-%token COLON EQUAL COMMA VAR IN
+%token COLON EQUAL COMMA VAR IN INPUT OUTPUT
 %token EOF
 
 %start program             /* the entry point */
@@ -32,8 +32,10 @@
 
 %%
 program:
-  VAR vars=separated_list(COMMA, var) IN eqs=list(equ) EOF
-    { { p_eqs = eqs; p_vars = Env.of_list vars } }
+  INPUT inp=separated_list(COMMA, NAME)
+    OUTPUT out=separated_list(COMMA, NAME)
+    VAR vars=separated_list(COMMA, var) IN eqs=list(equ) EOF
+    { { p_eqs = eqs; p_vars = Env.of_list vars; p_inputs = inp; p_outputs = out; } }
 
 equ:
   x=NAME EQUAL e=exp { (x, e) }

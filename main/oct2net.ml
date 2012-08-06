@@ -14,7 +14,7 @@ let expect_ident e = match e.e_desc with
 
 let tr_value v = match v with
   | VBit b -> Netlist_ast.VBit b
-  | VBitArray a -> Netlist_ast.VBitArray (Array.to_list a)
+  | VBitArray a -> Netlist_ast.VBitArray a
 
 let tr_ty ty = match ty with
   | TBit -> Netlist_ast.TBit
@@ -68,13 +68,14 @@ let rec tr_exp e = match e.e_desc with
 let tr_eq (pat, e) =
   tr_pat pat, tr_exp e
 
+let tr_vds env vds =
+  List.fold_left
+    (fun env vd -> Netlist_ast.Env.add vd.v_ident (tr_ty vd.v_ty) env)
+    env vds
+
 let tr_block b = match b with
   | BEqs (eqs, vds) ->
-      let env =
-        List.fold_left
-          (fun env vd -> Netlist_ast.Env.add vd.v_ident (tr_ty vd.v_ty) env)
-          Netlist_ast.Env.empty vds
-      in
+      let env = tr_vds Netlist_ast.Env.empty vds in
       let eqs = List.map tr_eq eqs in
       env, eqs
   | _ -> assert false
@@ -82,4 +83,9 @@ let tr_block b = match b with
 let program p =
   let n = match p.p_nodes with [n] -> n | _ -> assert false in
   let vars, eqs = tr_block n.n_body in
-  { Netlist_ast.p_vars = vars; Netlist_ast.p_eqs = eqs }
+  let vars = tr_vds vars n.n_inputs in
+  let vars = tr_vds vars n.n_outputs in
+  let inputs = List.map (fun vd -> vd.v_ident) n.n_inputs in
+  let outputs = List.map (fun vd -> vd.v_ident) n.n_outputs in
+  { Netlist_ast.p_inputs = inputs; Netlist_ast.p_outputs = outputs;
+    Netlist_ast.p_vars = vars; Netlist_ast.p_eqs = eqs }

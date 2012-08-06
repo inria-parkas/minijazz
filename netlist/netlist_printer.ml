@@ -12,6 +12,13 @@ let rec print_env print lp sep rp ff env =
         fprintf ff "%s%a" sep print (x, ty)) env;
   fprintf ff "%s" rp
 
+let rec print_list print lp sep rp ff = function
+  | [] -> ()
+  | x :: l ->
+      fprintf ff "%s%a" lp print x;
+      List.iter (fprintf ff "%s %a" sep print) l;
+      fprintf ff "%s" rp
+
 let print_ty ff ty = match ty with
   | TBit -> ()
   | TBitArray n -> fprintf ff " : %d" n
@@ -24,7 +31,7 @@ let print_bool ff b =
 
 let print_value ff v = match v with
   | VBit b -> print_bool ff b
-  | VBitArray bl -> List.iter (print_bool ff) bl
+  | VBitArray a -> Array.iter (print_bool ff) a
 
 let print_arg ff arg = match arg with
   | Aconst v -> print_value ff v
@@ -61,8 +68,14 @@ let print_vars ff env =
   fprintf ff "@[<v 2>VAR@,%a@]@.IN@,"
     (print_env print_var "" ", " "") env
 
+let print_idents ff ids =
+  let print_ident ff s = fprintf ff "%s" s in
+  print_list print_ident """,""" ff ids
+
 let print_program oc p =
   let ff = formatter_of_out_channel oc in
+  fprintf ff "INPUT %a@." print_idents p.p_inputs;
+  fprintf ff "OUTPUT %a@." print_idents p.p_outputs;
   print_vars ff p.p_vars;
   List.iter (print_eq ff) p.p_eqs;
   (* flush *)

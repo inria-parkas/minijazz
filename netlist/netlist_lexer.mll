@@ -7,10 +7,12 @@ let keyword_list =
   "AND", AND;
   "CONCAT", CONCAT;
   "IN", IN;
+  "INPUT", INPUT;
   "MUX", MUX;
   "NAND", NAND;
   "NOT", NOT;
   "OR", OR;
+  "OUTPUT", OUTPUT;
   "RAM", RAM;
   "REG", REG;
   "ROM", ROM;

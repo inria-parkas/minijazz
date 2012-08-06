@@ -11,7 +11,7 @@ module Env = struct
 end
 
 type ty = TBit | TBitArray of int
-type value = VBit of bool | VBitArray of bool list
+type value = VBit of bool | VBitArray of bool array
 
 type binop = Or | Xor | And | Nand
 
@@ -37,4 +37,6 @@ type equation = ident * exp
 
 type program =
     { p_eqs : equation list;
+      p_inputs : ident list;
+      p_outputs : ident list;
       p_vars : ty Env.t; }
