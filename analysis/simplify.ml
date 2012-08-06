@@ -2,23 +2,12 @@ open Ast
 open Static
 
 let rec simplify_exp e = match e.e_desc with
-  | Ecall("select", idx::params, [{ e_desc = Ecall ("slice", min::_, args) }]) ->
-      let new_idx = SBinOp (SMinus, SBinOp (SAdd, idx, min), SInt 1) in
-      let new_idx = Static.simplify NameEnv.empty new_idx in
-      let new_e = { e with e_desc = Ecall("select", new_idx::params, args) } in
-      simplify_exp new_e
   (* replace x[i..j] with [] if j < i *)
   | Ecall("slice", [SInt min; SInt max; n], _) when max < min ->
       { e with e_desc = Econst (VBitArray (Array.make 0 false)) }
+  (* replace x[i..i] with x[i] *)
   | Ecall("slice", [min; max; n], args) when min = max ->
       let new_e = { e with e_desc = Ecall("select", [min; n], args) } in
-      simplify_exp new_e
-  | Ecall("slice", [min1; max1; n1], [{ e_desc = Ecall ("slice", [min2; max2; n2], args) }]) ->
-      let new_min = SBinOp (SMinus, SBinOp (SAdd, min2, min1), SInt 1) in
-      let new_min = Static.simplify NameEnv.empty new_min in
-      let new_max = SBinOp (SMinus, SBinOp (SAdd, min2, max1), SInt 1) in
-      let new_max = Static.simplify NameEnv.empty new_max in
-      let new_e = { e with e_desc = Ecall("slice", [new_min; new_max; n1], args) } in
       simplify_exp new_e
   | Ecall(f, params, args) ->
       { e with e_desc = Ecall(f, params, List.map simplify_exp args) }
