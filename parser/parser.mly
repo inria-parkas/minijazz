@@ -152,6 +152,7 @@ const:
       | 1 -> VBit true
       | _ -> raise Parsing.Parse_error
     }
+  | LBRACKET RBRACKET { VBitArray (Array.make 0 false) }
 
 rom_or_ram :
   | ROM { MRom }

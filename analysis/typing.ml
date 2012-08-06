@@ -67,8 +67,9 @@ module Modules = struct
     add_sig ~params:["n1"; "n2"]
       "concat" [TBitArray (SVar "n1"); TBitArray (SVar "n2")]
       [TBitArray (SBinOp(SAdd, SVar "n1", SVar "n2"))];
-    (* slice :  size = max - min + 1 *)
+    (* slice :  size = min <= max ? max - min + 1 : 0 *)
     let size = SBinOp(SAdd, (SBinOp(SMinus, SVar "max", SVar "min")), SInt 1) in
+    let size = SIf(SBinOp(SLeq, SVar "min", SVar "max"), size, SInt 0) in
     let constr1 = SBinOp(SLess, SInt 0, SVar "min") in
     let constr2 = SBinOp(SLeq, SVar "max", SVar "n") in
     add_sig ~params:["min"; "max"; "n"] ~constr:[constr1; constr2] "slice"
@@ -113,6 +114,8 @@ end
 let constr_list = ref []
 let add_constraint se =
   constr_list := se :: !constr_list
+let set_constraints cl =
+  constr_list := cl
 let get_constraints () =
   let v = !constr_list in
   constr_list := []; v
@@ -184,6 +187,11 @@ let rec type_static_exp se = match se with
       expect_static_exp se1 STInt;
       expect_static_exp se2 STInt;
       STBool
+    | SIf (c, se1, se2) ->
+        expect_static_exp se1 STBool;
+        let ty1 = type_static_exp se1 in
+        expect_static_exp se2 ty1;
+        ty1
 
 and expect_static_exp se ty =
   let found_ty = type_static_exp se in
@@ -202,9 +210,13 @@ let solve_constr params cl =
   let params = List.map (fun p -> p.p_name) params in
   let rec find_simplification cl = match cl with
     | [] -> None, []
-    | ((SBinOp(SEqual, SVar s, se))
-          |(SBinOp(SEqual, se, SVar s)))::cl when not (List.mem s params) ->
-      Some (s, se), cl
+    | ( SBinOp(SEqual, SVar s, se)
+      | SBinOp(SEqual, se, SVar s)
+      | SIf(_, SBinOp(SEqual, SVar s, se), SBool true)
+      | SIf(_, SBinOp(SEqual, se, SVar s), SBool true)
+      | SIf(_, SBool true, SBinOp(SEqual, SVar s, se))
+      | SIf(_, SBool true, SBinOp(SEqual, se, SVar s)) )::cl when not (List.mem s params) ->
+        Some (s, se), cl
     | c::cl ->
       let res, cl = find_simplification cl in
       res, c::cl
@@ -227,18 +239,6 @@ let solve_constr params cl =
   let cl = simplify_constr cl in
   let cl = solve_one cl in
   cl, !env
-
-let subst_from_condition se = match se with
-  | SBinOp(SEqual, SVar n, se1) | SBinOp(SEqual, se1, SVar n) ->
-    NameEnv.add n se1 NameEnv.empty
-  | _ -> NameEnv.empty
-
-let simplify_ty env ty = match ty with
-  | TBitArray se -> TBitArray (simplify env se)
-  | _ -> ty
-
-let simplify_env env =
-  IdentEnv.map (simplify_ty env)
 
 (* Typing of expressions *)
 let rec type_exp env e =
@@ -304,12 +304,14 @@ let rec type_block env b = match b with
     let eqs = List.map (type_eq env) eqs in
     BEqs(eqs,vds)
   | BIf(se, trueb, falseb) ->
-    expect_static_exp se STBool;
-    let falseb = type_block env falseb in
-    (* Type the true block using the information given by the condition*)
-    let new_env = simplify_env (subst_from_condition se) env in
-    let trueb = type_block new_env trueb in
-    BIf(se, trueb, falseb)
+      expect_static_exp se STBool;
+      let prev_constr = get_constraints () in
+      let trueb = type_block env trueb in
+      let true_constr = List.map (fun c -> SIf (se, c, SBool true)) (get_constraints ()) in
+      let falseb = type_block env falseb in
+      let false_constr = List.map (fun c -> SIf (se, SBool true, c)) (get_constraints ()) in
+      set_constraints (prev_constr @ true_constr @ false_constr);
+      BIf(se, trueb, falseb)
 
 let ty_repr_block env b =
   let static_exp funs acc se = subst env se, acc in

@@ -54,6 +54,11 @@ and static_exp funs acc sd = match sd with
       let se1, acc = static_exp_it funs acc se1 in
       let se2, acc = static_exp_it funs acc se2 in
       SBinOp(sop, se1, se2), acc
+  | SIf(c, se1, se2) ->
+      let c, acc = static_exp_it funs acc c in
+      let se1, acc = static_exp_it funs acc se1 in
+      let se2, acc = static_exp_it funs acc se2 in
+      SIf(c, se1, se2), acc
 
 and ty_it funs acc t = try funs.ty funs acc t with Fallback -> ty funs acc t
 and ty funs acc t = match t with

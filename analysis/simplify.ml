@@ -7,6 +7,9 @@ let rec simplify_exp e = match e.e_desc with
       let new_idx = Static.simplify NameEnv.empty new_idx in
       let new_e = { e with e_desc = Ecall("select", new_idx::params, args) } in
       simplify_exp new_e
+  (* replace x[i..j] with [] if j < i *)
+  | Ecall("slice", [SInt min; SInt max; n], _) when max < min ->
+      { e with e_desc = Econst (VBitArray (Array.make 0 false)) }
   | Ecall("slice", [min; max; n], args) when min = max ->
       let new_e = { e with e_desc = Ecall("select", [min; n], args) } in
       simplify_exp new_e

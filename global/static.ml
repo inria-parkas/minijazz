@@ -12,6 +12,7 @@ type static_exp =
   | SBool of bool
   | SVar of name
   | SBinOp of sop * static_exp * static_exp
+  | SIf of static_exp * static_exp * static_exp (* se1 ? se2 : se3 *)
 
 type static_ty = STInt | STBool
 
@@ -53,6 +54,12 @@ let rec simplify env se = match se with
           let f = fun_of_comp_op op in
             SBool (f i1 i2)
       | _, se1, se2 -> SBinOp(op, se1, se2))
+  | SIf(c, se1, se2) ->
+      (match simplify env c, simplify env se1, simplify env se2 with
+        | SBool true, se1, _ -> se1
+        | SBool false, _, se2 -> se2
+        | _, SBool true, SBool true -> SBool true
+        | c, se1, se2 -> SIf(c, se1, se2))
 
 let rec subst env se = match se with
   | SInt _ | SBool _ -> se
@@ -63,6 +70,8 @@ let rec subst env se = match se with
           | Not_found -> se)
   | SBinOp(op, se1, se2) ->
       SBinOp(op, subst env se1, subst env se2)
+  | SIf(c, se1, se2) ->
+       SIf(subst env c, subst env se1, subst env se2)
 
 exception Unsatisfiable of static_exp
 let check_true env cl =

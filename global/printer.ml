@@ -28,6 +28,7 @@ let print_bool ff b =
 
 let rec print_const ff v = match v with
   | VBit b -> print_bool ff b
+  | VBitArray a when Array.length a = 0 -> fprintf ff "[]"
   | VBitArray l -> Array.iter (print_bool ff) l
 
 let rec print_static_exp ff se = match se with
@@ -42,6 +43,9 @@ let rec print_static_exp ff se = match se with
       | SLess -> "<" | SLeq -> "<="
       | SGreater -> ">" | SGeq -> ">=" in
       fprintf ff "(%a %s %a)" print_static_exp se1  op_str  print_static_exp se2
+  | SIf (c, se1, se2) ->
+      fprintf ff "(%a ? %a : %a)"
+        print_static_exp c  print_static_exp se1  print_static_exp se1
 
 let rec print_static_type ff sty = match sty with
   | STInt -> fprintf ff "int"
@@ -89,22 +93,6 @@ and print_edesc ff ed = match ed with
 
 and print_args ff args =
   print_list_r print_exp "(" "," ")" ff args
-
-(*and print_prim ff prim args = match prim with
-  | PAnd | POr | PXor | PNand -> (*binary op*)
-    let s = match prim with
-      | PAnd -> "and"   | POr -> "or"
-      | PNand -> "nand" | PXor -> "xor"
-      | _ -> assert false in
-    let e1, e2 = Misc.assert_2 args in
-      fprintf ff "%a %s %a" print_exp e1  s  print_exp e2
-
-  | PNot | PMux -> (*unary op*)
-    let s = match prim with
-      | PMux -> "mux" | PNot -> "not"
-      | _ -> assert false in
-    let e1 = Misc.assert_1 args in
-      fprintf ff "%s(%a)" s  print_exp e1*)
 
 let rec print_pat ff pat = match pat with
   | Evarpat id -> print_ident ff id

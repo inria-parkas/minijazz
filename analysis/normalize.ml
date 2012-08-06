@@ -2,7 +2,6 @@ open Ast
 open Mapfold
 
 let mk_eq e =
-  (* TODO: fonctions avec plusieurs sorties *)
   let id = "_l" ^ (Misc.gen_symbol ()) in
   let eq = (Evarpat id, e) in
   let vd = mk_var_dec id e.e_ty in
