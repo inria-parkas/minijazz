@@ -9,7 +9,7 @@ let main_node = ref "main"
 let base_path = ref ""
 
 let show_version () =
-  Format.printf "The Octogon compiler, version %s @." version
+  Format.printf "The MiniJazz compiler, version %s @." version
 let errmsg = "Options are:"
 
 let doc_verbose = "\t\t\tSet verbose mode"

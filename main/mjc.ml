@@ -1,5 +1,5 @@
 open Cli_options
-open Octogon_compiler
+open Mj_compiler
 
 let main () =
   try
