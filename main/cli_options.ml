@@ -9,10 +9,10 @@ let main_node = ref "main"
 let base_path = ref ""
 
 let show_version () =
-  Format.printf "The Octagon compiler, version %s @." version
+  Format.printf "The Octogon compiler, version %s @." version
 let errmsg = "Options are:"
 
 let doc_verbose = "\t\t\tSet verbose mode"
 and doc_version = "\t\tThe version of the compiler"
-and doc_full_type_info = "\t\t\tPrint full type information"
-and doc_main_node = "\t\tSet the main node"
+and doc_full_type_info = "\t\tPrint full type information"
+and doc_main_node = "\t\t\tSet the main node"
