@@ -10,7 +10,7 @@ let compile filename =
       close_out out
     in
     begin try
-        let p = Scheduler_corrige.schedule p in
+        let p = Scheduler.schedule p in
         Netlist_printer.print_program out p;
       with
         | Scheduler.Combinational_cycle ->
