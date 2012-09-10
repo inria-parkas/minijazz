@@ -71,7 +71,9 @@ let do_subst_block m subst b  =
   let static_exp funs (subst, m) se =
     simplify m se, (subst, m)
   in
-  let exp funs (subst, m) e = match e.e_desc with
+  let exp funs (subst, m) e =
+    let e, _ = Mapfold.exp funs (subst, m) e in
+    match e.e_desc with
     | Evar x ->
         let e = if IdentEnv.mem x subst then IdentEnv.find x subst else e in
         e, (subst, m)
