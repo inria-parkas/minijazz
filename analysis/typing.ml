@@ -62,7 +62,8 @@ module Modules = struct
     add_sig "mux" [TBit;TBit;TBit] [TBit];
     add_sig ~params:["n"] "print" [TBitArray (SVar "n"); TBit] [TBit];
     add_sig ~params:["n"] "input" [TBit] [TBitArray (SVar "n")];
-    add_sig ~params:["i"; "n"] ~constr:[SBinOp(SLeq, SVar "i", SVar "n")]
+    add_sig ~params:["i"; "n"]
+      ~constr:[SBinOp(SLess, SVar "i", SVar "n"); SBinOp(SLeq, SInt 0, SVar "i")]
       "select" [TBitArray (SVar "n")] [TBit];
     add_sig ~params:["n1"; "n2"]
       "concat" [TBitArray (SVar "n1"); TBitArray (SVar "n2")]
@@ -70,8 +71,8 @@ module Modules = struct
     (* slice :  size = min <= max ? max - min + 1 : 0 *)
     let size = SBinOp(SAdd, (SBinOp(SMinus, SVar "max", SVar "min")), SInt 1) in
     let size = SIf(SBinOp(SLeq, SVar "min", SVar "max"), size, SInt 0) in
-    let constr1 = SBinOp(SLess, SInt 0, SVar "min") in
-    let constr2 = SBinOp(SLeq, SVar "max", SVar "n") in
+    let constr1 = SBinOp(SLeq, SInt 0, SVar "min") in
+    let constr2 = SBinOp(SLess, SVar "max", SVar "n") in
     add_sig ~params:["min"; "max"; "n"] ~constr:[constr1; constr2] "slice"
       [TBitArray (SVar "n")] [TBitArray size]
 
