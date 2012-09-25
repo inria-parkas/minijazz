@@ -134,6 +134,12 @@ _exp:
     { Ecall ("select", [idx; fresh_param()], [e1]) }
   | e1=simple_exp LBRACKET low=static_exp DOTDOT high=static_exp RBRACKET
     { Ecall("slice", [low; high; fresh_param()], [e1]) }
+  | e1=simple_exp LBRACKET low=static_exp DOTDOT RBRACKET
+    { let n = fresh_param () in
+      let high = SBinOp(SMinus, n, SInt 1) in
+      Ecall("slice", [low; high; n], [e1]) }
+  | e1=simple_exp LBRACKET DOTDOT high=static_exp RBRACKET
+    { Ecall("slice", [SInt 0; high; fresh_param()], [e1]) }
   | ro=rom_or_ram LESS addr_size=static_exp
     COMMA word_size=static_exp input_file=tag_option(COMMA, STRING) GREATER a=exps
     { Emem(ro, addr_size, word_size, input_file, a) }
