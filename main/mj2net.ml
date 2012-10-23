@@ -2,9 +2,10 @@ open Ast
 open Static
 
 let expect_int se =
-  match simplify NameEnv.empty se with
+  let se = simplify NameEnv.empty se in
+  match se.se_desc with
     | SInt v -> v
-    | se ->
+    | _ ->
         Format.eprintf "Unexpected static exp: %a@." Printer.print_static_exp se;
         assert false
 

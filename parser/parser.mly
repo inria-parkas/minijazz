@@ -6,7 +6,7 @@ open Location
 open Misc
 
 let fresh_param () =
-  SVar ("_n"^(Misc.gen_symbol ()))
+  mk_static_exp (SVar ("_n"^(Misc.gen_symbol ())))
 
 %}
 
@@ -99,10 +99,11 @@ pat:
   | n=NAME                              { Evarpat n }
   | LPAREN p=snlist(COMMA, NAME) RPAREN { Etuplepat p }
 
-static_exp :
+static_exp: se=_static_exp { mk_static_exp ~loc:(Loc ($startpos,$endpos)) se }
+_static_exp :
   | i=INT { SInt i }
   | n=NAME { SVar n }
-  | LPAREN se=static_exp RPAREN { se }
+  | LPAREN se=_static_exp RPAREN { se }
   /*integer ops*/
   | se1=static_exp POWER se2=static_exp { SBinOp(SPower, se1, se2) }
   | se1=static_exp PLUS se2=static_exp { SBinOp(SAdd, se1, se2) }
@@ -136,10 +137,13 @@ _exp:
     { Ecall("slice", [low; high; fresh_param()], [e1]) }
   | e1=simple_exp LBRACKET low=static_exp DOTDOT RBRACKET
     { let n = fresh_param () in
-      let high = SBinOp(SMinus, n, SInt 1) in
+      let high = mk_static_exp (SBinOp(SMinus, n, mk_static_exp (SInt 1))) in
       Ecall("slice", [low; high; n], [e1]) }
   | e1=simple_exp LBRACKET DOTDOT high=static_exp RBRACKET
-    { Ecall("slice", [SInt 0; high; fresh_param()], [e1]) }
+    {
+      let params = [mk_static_exp (SInt 0); high; fresh_param ()] in
+      Ecall("slice", params, [e1])
+    }
   | ro=rom_or_ram LESS addr_size=static_exp
     COMMA word_size=static_exp input_file=tag_option(COMMA, STRING) GREATER a=exps
     { Emem(ro, addr_size, word_size, input_file, a) }

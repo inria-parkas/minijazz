@@ -6,6 +6,7 @@ exception Fallback
 
 type 'a it_funs = {
   static_exp : 'a it_funs -> 'a -> static_exp -> static_exp * 'a;
+  static_exp_desc : 'a it_funs -> 'a -> static_exp_desc -> static_exp_desc * 'a;
   ty : 'a it_funs -> 'a -> ty -> ty * 'a;
   link : 'a it_funs -> 'a -> link -> link * 'a;
   edesc : 'a it_funs -> 'a -> edesc -> edesc * 'a;
@@ -47,9 +48,15 @@ and edesc funs acc ed = match ed with
 and static_exp_it funs acc sd =
   try funs.static_exp funs acc sd
   with Fallback -> static_exp funs acc sd
+and static_exp funs acc se =
+  let se_desc, acc = static_exp_desc_it funs acc se.se_desc in
+  { se with se_desc = se_desc }, acc
 
-and static_exp funs acc sd = match sd with
-  | SInt _ | SBool _ | SVar _ -> sd, acc
+and static_exp_desc_it funs acc sed =
+  try funs.static_exp_desc funs acc sed
+  with Fallback -> static_exp_desc funs acc sed
+and static_exp_desc funs acc sed = match sed with
+  | SInt _ | SBool _ | SVar _ -> sed, acc
   | SBinOp (sop, se1, se2) ->
       let se1, acc = static_exp_it funs acc se1 in
       let se2, acc = static_exp_it funs acc se2 in
@@ -142,6 +149,7 @@ and program funs acc p =
 
 let defaults = {
   static_exp = static_exp;
+  static_exp_desc = static_exp_desc;
   ty = ty;
   link = link;
   edesc = edesc;

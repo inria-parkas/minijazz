@@ -31,7 +31,7 @@ let rec print_const ff v = match v with
   | VBitArray a when Array.length a = 0 -> fprintf ff "[]"
   | VBitArray l -> Array.iter (print_bool ff) l
 
-let rec print_static_exp ff se = match se with
+let rec print_static_exp ff se = match se.se_desc with
   | SInt i -> fprintf ff "%d" i
   | SBool b -> print_bool ff b
   | SVar n -> print_name ff n

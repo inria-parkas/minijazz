@@ -7,12 +7,14 @@ open Errors
 (** Inlines all nodes with static paramaters. *)
 
 let expect_bool env se =
-  match simplify env se with
+  let se = simplify env se in
+  match se.se_desc with
     | SBool v -> v
     | _ -> Format.eprintf "Expected a boolean@."; raise Error
 
 let expect_int env se =
-  match simplify env se with
+  let se = simplify env se in
+  match se.se_desc with
     | SInt v -> v
     | _ -> Format.eprintf "Expected an integer@."; raise Error
 

@@ -7,14 +7,37 @@ open Errors
 (** Simplifies static expression in the program. *)
 let simplify_program p =
   let const_dec funs cenv cd =
-    let v = simplify cenv cd.c_value in
+    let v = subst cenv cd.c_value in
     let cenv = NameEnv.add cd.c_name v cenv in
     { cd with c_value = v }, cenv
   in
   let static_exp funs cenv se =
-    simplify cenv se, cenv
+    let se = subst cenv se in
+    (match se.se_desc with
+      | SVar id ->
+          (* Constants with se.se_loc = no_location are generated and should not be checked *)
+          if not (NameEnv.mem id cenv) && not (se.se_loc == no_location) then (
+            Format.eprintf "%aThe constant name '%s' is unbound@."
+              print_location se.se_loc id;
+            raise Error
+          )
+      | _ -> ()
+    );
+    se, cenv
   in
-  let funs = { Mapfold.defaults with const_dec = const_dec; static_exp = static_exp } in
+  let node_dec funs cenv nd =
+    let cenv' =
+      List.fold_left
+        (fun cenv p -> NameEnv.add p.p_name (mk_static_var p.p_name) cenv)
+        cenv nd.n_params
+    in
+    let nd, _ = Mapfold.node_dec funs cenv' nd in
+    nd, cenv
+  in
+  let funs =
+    { Mapfold.defaults with const_dec = const_dec;
+      static_exp = static_exp; node_dec = node_dec }
+  in
   let p, _ = Mapfold.program_it funs NameEnv.empty p in
   p
 

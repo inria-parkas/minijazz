@@ -60,21 +60,31 @@ module Modules = struct
     add_sig "not" [TBit] [TBit];
     add_sig "reg" [TBit] [TBit];
     add_sig "mux" [TBit;TBit;TBit] [TBit];
-    add_sig ~params:["n"] "print" [TBitArray (SVar "n"); TBit] [TBit];
-    add_sig ~params:["n"] "input" [TBit] [TBitArray (SVar "n")];
+    add_sig ~params:["n"] "print" [TBitArray (mk_static_var "n"); TBit] [TBit];
+    add_sig ~params:["n"] "input" [TBit] [TBitArray (mk_static_var "n")];
+    let constr1 = mk_static_exp (SBinOp(SLess, mk_static_var "i", mk_static_var "n")) in
+    let constr2 = mk_static_exp (SBinOp(SLeq, mk_static_int 0, mk_static_var "i")) in
     add_sig ~params:["i"; "n"]
-      ~constr:[SBinOp(SLess, SVar "i", SVar "n"); SBinOp(SLeq, SInt 0, SVar "i")]
-      "select" [TBitArray (SVar "n")] [TBit];
+      ~constr:[constr1; constr2]
+      "select" [TBitArray (mk_static_var "n")] [TBit];
     add_sig ~params:["n1"; "n2"]
-      "concat" [TBitArray (SVar "n1"); TBitArray (SVar "n2")]
-      [TBitArray (SBinOp(SAdd, SVar "n1", SVar "n2"))];
+      "concat" [TBitArray (mk_static_var "n1"); TBitArray (mk_static_var "n2")]
+      [TBitArray (mk_static_exp (SBinOp(SAdd, mk_static_var "n1", mk_static_var "n2")))];
     (* slice :  size = min <= max ? max - min + 1 : 0 *)
-    let size = SBinOp(SAdd, (SBinOp(SMinus, SVar "max", SVar "min")), SInt 1) in
-    let size = SIf(SBinOp(SLeq, SVar "min", SVar "max"), size, SInt 0) in
-    let constr1 = SBinOp(SLeq, SInt 0, SVar "min") in
-    let constr2 = SBinOp(SLess, SVar "max", SVar "n") in
+    let size =
+      mk_static_exp
+        (SBinOp(SAdd,
+               mk_static_exp (SBinOp(SMinus, mk_static_var "max", mk_static_var "min")),
+               mk_static_int 1))
+    in
+    let size =
+      mk_static_exp (SIf (mk_static_exp (SBinOp(SLeq, mk_static_var "min", mk_static_var "max")),
+                                        size, mk_static_int 0))
+    in
+    let constr1 = mk_static_exp (SBinOp(SLeq, mk_static_int 0, mk_static_var "min")) in
+    let constr2 = mk_static_exp (SBinOp(SLess, mk_static_var "max", mk_static_var "n")) in
     add_sig ~params:["min"; "max"; "n"] ~constr:[constr1; constr2] "slice"
-      [TBitArray (SVar "n")] [TBitArray size]
+      [TBitArray (mk_static_var "n")] [TBitArray size]
 
 
   let tys_of_vds vds = List.map (fun vd -> vd.v_ty) vds
@@ -159,8 +169,10 @@ let rec unify ty1 ty2 =
   if ty1 == ty2 then ()
   else
    match (ty1, ty2) with
-     | TBitArray n, TBit | TBit, TBitArray n -> add_constraint (SBinOp(SEqual, n, SInt 1))
-     | TBitArray n1, TBitArray n2 -> add_constraint (SBinOp(SEqual, n1, n2))
+     | TBitArray n, TBit | TBit, TBitArray n ->
+         add_constraint (mk_static_exp (SBinOp(SEqual, n, mk_static_int 1)))
+     | TBitArray n1, TBitArray n2 ->
+         add_constraint (mk_static_exp (SBinOp(SEqual, n1, n2)))
      | TVar { contents = TIndex n1 }, TVar { contents = TIndex n2 } when n1 = n2 -> ()
      | TProd ty_list1, TProd ty_list2 ->
        if List.length ty_list1 <> List.length ty_list2 then
@@ -177,7 +189,7 @@ let prod ty_list = match ty_list with
   | _ -> TProd ty_list
 
 (* Typing of static exps *)
-let rec type_static_exp se = match se with
+let rec type_static_exp se = match se.se_desc with
     | SInt _ | SVar _ -> STInt
     | SBool _ -> STBool
     | SBinOp((SAdd | SMinus | SMult | SDiv | SPower ), se1, se2) ->
@@ -202,7 +214,8 @@ and expect_static_exp se ty =
 let rec simplify_constr cl = match cl with
   | [] -> []
   | c::cl ->
-      match simplify NameEnv.empty c with
+      let c' = simplify NameEnv.empty c in
+      match c'.se_desc with
         | SBool true -> simplify_constr cl
         | SBool false -> error (Static_constraint_false c)
         | _ -> c::(simplify_constr cl)
@@ -211,21 +224,27 @@ let solve_constr params cl =
   let params = List.map (fun p -> p.p_name) params in
   let rec find_simplification cl = match cl with
     | [] -> None, []
-    | ( SBinOp(SEqual, SVar s, se)
-      | SBinOp(SEqual, se, SVar s)
-      | SIf(_, SBinOp(SEqual, SVar s, se), SBool true)
-      | SIf(_, SBinOp(SEqual, se, SVar s), SBool true)
-      | SIf(_, SBool true, SBinOp(SEqual, SVar s, se))
-      | SIf(_, SBool true, SBinOp(SEqual, se, SVar s)) )::cl when not (List.mem s params) ->
+    | { se_desc = (SBinOp(SEqual, { se_desc = SVar s }, se)
+      | SBinOp(SEqual, se, { se_desc = SVar s })
+      | SIf(_, { se_desc = SBinOp(SEqual, { se_desc = SVar s }, se) },
+           { se_desc = SBool true })
+      | SIf(_, { se_desc = SBinOp(SEqual, se, { se_desc = SVar s }) },
+           { se_desc = SBool true })
+      | SIf(_, { se_desc = SBool true },
+           { se_desc = SBinOp(SEqual, { se_desc  = SVar s }, se) })
+      | SIf(_, { se_desc = SBool true },
+           { se_desc = SBinOp(SEqual, se, { se_desc = SVar s }) }) ) }::cl
+        when not (List.mem s params) ->
         Some (s, se), cl
     | c::cl ->
       let res, cl = find_simplification cl in
       res, c::cl
   in
   let subst_and_error env c =
-    match subst env c with
+    let c' = subst env c in
+    match c'.se_desc with
       | SBool false -> error (Static_constraint_false c)
-      | c -> c
+      | _ -> c'
   in
   let env = ref NameEnv.empty in
   let rec solve_one cl =
@@ -246,7 +265,7 @@ let rec type_exp env e =
   try
     let desc, ty = match e.e_desc with
       | Econst (VBit _) -> e.e_desc, TBit
-      | Econst (VBitArray a) -> e.e_desc, TBitArray (SInt (Array.length a))
+      | Econst (VBitArray a) -> e.e_desc, TBitArray (mk_static_int (Array.length a))
       | Evar id -> Evar id, IdentEnv.find id env
       | Ereg e ->
           let e = expect_exp env e TBit in
@@ -308,9 +327,13 @@ let rec type_block env b = match b with
       expect_static_exp se STBool;
       let prev_constr = get_constraints () in
       let trueb = type_block env trueb in
-      let true_constr = List.map (fun c -> SIf (se, c, SBool true)) (get_constraints ()) in
+      let true_constr =
+        List.map (fun c -> mk_static_exp (SIf (se, c, mk_static_bool true))) (get_constraints ())
+      in
       let falseb = type_block env falseb in
-      let false_constr = List.map (fun c -> SIf (se, SBool true, c)) (get_constraints ()) in
+      let false_constr =
+        List.map (fun c -> mk_static_exp (SIf (se, mk_static_bool true, c))) (get_constraints ())
+      in
       set_constraints (prev_constr @ true_constr @ false_constr);
       BIf(se, trueb, falseb)
 
