@@ -1,10 +1,10 @@
+open Ident
 open Ast
 open Static
 open Format
 open Misc
 
 let print_name ff n = fprintf ff "%s" n
-let print_ident ff id = fprintf ff "%s" id
 
 let rec print_list_r print lp sep rp ff = function
   | [] -> ()
@@ -105,12 +105,12 @@ let print_eqs ff eqs =
   print_list_nlr print_eq """;""" ff eqs
 
 let print_var_dec ff vd = match vd.v_ty with
-  | TUnit -> fprintf ff "@[%a : .@]" print_name vd.v_ident
-  | TBit -> fprintf ff "@[%a@]" print_name vd.v_ident
+  | TUnit -> fprintf ff "@[%a : .@]" print_ident vd.v_ident
+  | TBit -> fprintf ff "@[%a@]" print_ident vd.v_ident
   | TBitArray se ->
-    fprintf ff "@[%a : [%a]@]" print_name vd.v_ident  print_static_exp se
+    fprintf ff "@[%a : [%a]@]" print_ident vd.v_ident  print_static_exp se
   | TProd _ -> assert false
-  | TVar _ -> fprintf ff "%a : <var>" print_name vd.v_ident
+  | TVar _ -> fprintf ff "%a : <var>" print_ident vd.v_ident
 
 let print_var_decs ff vds =
   print_list_r print_var_dec "("","")" ff vds

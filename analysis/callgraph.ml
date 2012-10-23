@@ -33,7 +33,7 @@ let vars_of_pat env pat =
       let ty = IdentEnv.find id env in
       mk_exp ~ty:ty (Evar id)
     with
-      | Not_found -> Format.eprintf "Not in env: %s@." id; assert false
+      | Not_found -> Format.eprintf "Not in env: %a@." Ident.print_ident id; assert false
   in
   let rec _vars_of_pat acc pat = match pat with
     | Evarpat id -> (exp_of_ident id)::acc
@@ -46,7 +46,7 @@ let ident_of_exp e = match e.e_desc with
   | _ -> assert false
 
 let rename env vd =
-  let e = mk_exp ~ty:vd.v_ty (Evar (vd.v_ident ^(Misc.gen_symbol ()))) in
+  let e = mk_exp ~ty:vd.v_ty (Evar (Ident.copy vd.v_ident)) in
   IdentEnv.add vd.v_ident e env
 
 let build_params m names values =

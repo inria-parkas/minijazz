@@ -68,7 +68,8 @@ let check_names p =
   let exp funs (s, defnames) e = match e.e_desc with
     | Evar id ->
         if not (IdentSet.mem id s) then (
-          Format.eprintf "%aThe identifier '%s' is unbound@." print_location e.e_loc  id;
+          Format.eprintf "%aThe identifier '%a' is unbound@."
+            print_location e.e_loc Ident.print_ident id;
           raise Error
         );
         e, (s, defnames)

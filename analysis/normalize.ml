@@ -2,7 +2,7 @@ open Ast
 open Mapfold
 
 let mk_eq e =
-  let id = "_l" ^ (Misc.gen_symbol ()) in
+  let id = Ident.fresh_ident "_l" in
   let eq = (Evarpat id, e) in
   let vd = mk_var_dec id e.e_ty in
   Evar id, vd, eq

@@ -1,5 +1,6 @@
 %{
 
+open Ident
 open Static
 open Ast
 open Location
@@ -55,11 +56,17 @@ const_dec:
 
 name: n=NAME { n }
 
+ident:
+  | n=name { ident_of_string n }
+
 type_ident: LBRACKET se=static_exp RBRACKET { TBitArray se }
+
+node_name:
+  | n=name { reset_symbol_table (); n }
 
 node_decs: ns=list(node_dec) { ns }
 node_dec:
-  inlined=inlined_status n=name p=params LPAREN args=args RPAREN
+  inlined=inlined_status n=node_name p=params LPAREN args=args RPAREN
   EQUAL out=node_out WHERE b=block probes=probe_decls END WHERE option(SEMICOL)
       { mk_node n (Loc ($startpos,$endpos)) inlined args out p b probes }
 
@@ -81,8 +88,8 @@ param:
 args: vl=slist(COMMA, arg) { vl }
 
 arg:
-  | n=NAME COLON t=type_ident { mk_var_dec n t }
-  | n=NAME { mk_var_dec n TBit }
+  | n=ident COLON t=type_ident { mk_var_dec n t }
+  | n=ident { mk_var_dec n TBit }
 
 block:
   | eqs=equs { BEqs (eqs, []) }
@@ -96,8 +103,8 @@ equ_tail:
 equ: p=pat EQUAL e=exp { mk_equation p e }
 
 pat:
-  | n=NAME                              { Evarpat n }
-  | LPAREN p=snlist(COMMA, NAME) RPAREN { Etuplepat p }
+  | n=ident                              { Evarpat n }
+  | LPAREN p=snlist(COMMA, ident) RPAREN { Etuplepat p }
 
 static_exp: se=_static_exp { mk_static_exp ~loc:(Loc ($startpos,$endpos)) se }
 _static_exp :
@@ -150,7 +157,7 @@ _exp:
 
 simple_exp: e=_simple_exp { mk_exp ~loc:(Loc ($startpos,$endpos)) e }
 _simple_exp:
-  | n=NAME                    { Evar n }
+  | n=ident                   { Evar n }
   | LPAREN e=_exp RPAREN      { e }
 
 const:
@@ -174,5 +181,5 @@ call_params:
 
 probe_decls:
   | /*empty*/ { [] }
-  | PROBING l=separated_nonempty_list(COMMA, NAME) { l }
+  | PROBING l=separated_nonempty_list(COMMA, ident) { l }
 %%

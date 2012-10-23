@@ -1,7 +1,7 @@
 open Location
 open Static
 
-type ident = string
+type ident = Ident.t
 type name = string
 
 module IdentEnv = Map.Make (struct type t = ident let compare = compare end)

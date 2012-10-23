@@ -1,5 +1,6 @@
 open Ast
 open Static
+open Ident
 
 let expect_int se =
   let se = simplify NameEnv.empty se in
@@ -10,7 +11,7 @@ let expect_int se =
         assert false
 
 let expect_ident e = match e.e_desc with
-  | Evar id -> id
+  | Evar id -> string_of_ident id
   | _ -> assert false
 
 let tr_value v = match v with
@@ -23,21 +24,21 @@ let tr_ty ty = match ty with
   | _ -> Format.eprintf "Unexpected type: %a@." Printer.print_type ty; assert false
 
 let tr_var_dec { v_ident = n; v_ty = ty } =
-  n, tr_ty ty
+  string_of_ident n, tr_ty ty
 
 let tr_pat pat = match pat with
-  | Evarpat id -> id
+  | Evarpat id -> string_of_ident id
   | Etuplepat ids ->
       Format.eprintf "Unexpected pattern: %a@." Printer.print_pat pat;
       assert false
 
 let expect_arg e = match e.e_desc with
-  | Evar id -> Netlist_ast.Avar id
+  | Evar id -> Netlist_ast.Avar (string_of_ident id)
   | Econst v -> Netlist_ast.Aconst (tr_value v)
   | _ -> Format.eprintf "Unexpected arg : %a@." Printer.print_exp e; assert false
 
 let rec tr_exp e = match e.e_desc with
-  | Evar id -> Netlist_ast.Earg (Netlist_ast.Avar id)
+  | Evar id -> Netlist_ast.Earg (Netlist_ast.Avar (string_of_ident id))
   | Econst v ->  Netlist_ast.Earg (Netlist_ast.Aconst (tr_value v))
   | Ereg e -> Netlist_ast.Ereg (expect_ident e)
   | Ecall ("not", _, [e]) -> Netlist_ast.Enot (expect_arg e)
@@ -71,7 +72,7 @@ let tr_eq (pat, e) =
 
 let tr_vds env vds =
   List.fold_left
-    (fun env vd -> Netlist_ast.Env.add vd.v_ident (tr_ty vd.v_ty) env)
+    (fun env vd -> Netlist_ast.Env.add (string_of_ident vd.v_ident) (tr_ty vd.v_ty) env)
     env vds
 
 let tr_block b = match b with
@@ -86,7 +87,7 @@ let program p =
   let vars, eqs = tr_block n.n_body in
   let vars = tr_vds vars n.n_inputs in
   let vars = tr_vds vars n.n_outputs in
-  let inputs = List.map (fun vd -> vd.v_ident) n.n_inputs in
-  let outputs = List.map (fun vd -> vd.v_ident) n.n_outputs in
+  let inputs = List.map (fun vd -> string_of_ident vd.v_ident) n.n_inputs in
+  let outputs = List.map (fun vd -> string_of_ident vd.v_ident) n.n_outputs in
   { Netlist_ast.p_inputs = inputs; Netlist_ast.p_outputs = outputs;
     Netlist_ast.p_vars = vars; Netlist_ast.p_eqs = eqs }
