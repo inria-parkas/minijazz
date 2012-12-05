@@ -135,14 +135,19 @@ _l_5 = AND _l_4 c
 
 \subsection{Syntaxe abstraite}
 
-La syntaxe abstraite du langage de \emph{net-list}, c'est-à-dire l'ensemble des types représentant un circuit, est donné dans le fichier \texttt{netlist\_ast.ml}. Un analyseur lexical (\texttt{netlist\_lexer.mll}) et un analyseur syntaxique (\texttt{netlist\_parser.mly}) permettent de traduire un fichier texte dans la syntaxe concrète en la structure de données correspondante. On utilisera pour cela directement la fonction suivante définie dans le fichier \texttt{Netlist.ml}, qui attend un nom de fichier et renvoie le circuit correspondant:
+La syntaxe abstraite du langage de \emph{net-list}, c'est-à-dire l'ensemble des types représentant un circuit, est donnée dans le fichier \texttt{netlist\_ast.ml}. Un analyseur lexical (\texttt{netlist\_lexer.mll}) et un analyseur syntaxique (\texttt{netlist\_parser.mly}) permettent de traduire un fichier texte dans la syntaxe concrète en la structure de données correspondante. On utilisera pour cela directement la fonction suivante définie dans le fichier \texttt{Netlist.ml}, qui attend un nom de fichier et renvoie le circuit correspondant:
 \begin{lstlisting}[language={[objective]caml}]
 val read_file : string -> Netlist_ast.program
 \end{lstlisting}
 
-Pour faire l'opération inverse, on utilisera la fonction suivante, définie dans \texttt{netlist\_printer.ml}:
+Pour faire l'opération inverse, on utilisera la fonction suivante:
 \begin{lstlisting}[language={[objective]caml}, xrightmargin=0.5cm]
 val print_program : out_channel -> Netlist_ast.program -> unit
+\end{lstlisting}
+Par exemple, pour écrire un programme dans un fichier \texttt{filename}, on pourra faire:
+\begin{lstlisting}[language={[objective]caml}]
+let oc = open_out filename in
+print_program oc p
 \end{lstlisting}
 
 \end{document}
