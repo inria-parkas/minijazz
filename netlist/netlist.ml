@@ -4,7 +4,7 @@ let find_file filename =
   try
     open_in filename
   with
-    | _ -> raise (Parse_error "No such file '%s'")
+    | _ -> raise (Parse_error ("No such file '"^filename^"%s'"))
 
 let read_file filename =
   let ic = find_file filename in
