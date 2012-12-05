@@ -1,0 +1,33 @@
+\ProvidesPackage{mj_lang}
+
+\RequirePackage{listings}
+
+\lstdefinelanguage{minijazz}{
+morekeywords={where,end,reg,mux,if,then,else},
+otherkeywords={=, ;},
+sensitive=true,
+morecomment=[n]{(*}{*)},
+morestring=[b]",
+morestring=[b]'
+}
+
+\lstdefinelanguage{nl}{
+morekeywords={INPUT,OUTPUT,VAR,IN,CONCAT,SELECT,SLICE,OR,XOR,AND,NAND},
+otherkeywords={=},
+sensitive=true,
+morecomment=[n]{(*}{*)}
+}
+
+\lstset
+{
+columns=fixed, basicstyle=\ttfamily,
+keywordstyle=\bfseries,
+%commentstyle=\color{dkgreen},
+%stringstyle=\color{mauve},
+showstringspaces=false,
+breaklines,frame={tb}, mathescape=false,
+rulesep=1pt, xleftmargin=1cm, xrightmargin=1cm
+}
+\lstset{language=minijazz}
+
+\newcommand\minijazz{\textsc{MiniJazz}}

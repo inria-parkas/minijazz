@@ -1,0 +1,148 @@
+\documentclass[a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage[a4paper]{geometry}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{amsthm}
+\usepackage[a4paper]{geometry}
+
+\usepackage{mj_lang}
+
+% fontes tt avec gras (mots-clés)
+\renewcommand{\ttdefault}{txtt}
+
+\title{Manuel de \minijazz{}}
+\author{Cédric Pasteur \texttt{<cedric.pasteur@ens.fr>}}
+
+\begin{document}
+
+\maketitle
+
+\section{Le langage \minijazz}
+
+\subsection{Description du langage}
+
+Le langage \minijazz{} est un langage de description de circuits digitaux synchrones. Il permet de décrire des circuits de façon récursive et hiérarchique et d'utiliser des nappes de fils. Voici par exemple la description d'un \emph{full-adder}:
+\begin{lstlisting}
+fulladder(a,b,c) = (s, r) where
+  s = (a ^ b) ^ c;
+  r = (a & b) + ((a ^ b) & c);
+end where
+\end{lstlisting}
+
+\subsubsection*{Bloc}
+
+Un circuit est décrit par un ensemble de blocs. Un bloc est défini par son nom \texttt{f}, ses entrées \lstinline{a_1, .., a_p}, ses sorties \lstinline{o_1, ..., o_q} et un ensemble \texttt{D} d'équations définissant les sorties en fonction des entrées. Il est possible de définir des variables locales sans les déclarer.
+\begin{lstlisting}
+f(a_1, ..., a_p) = (o_1, ..., o_q) where
+  D
+end where
+\end{lstlisting}
+
+Les équations sont soit de la forme \lstinline+x = e+ où e est une expression, soit l'instantiation d'un autre bloc de la forme \lstinline+(y_1, ..., y_q) =  g(x_1, .., x_p)+, soit un bloc conditionnel \lstinline+if c then D1 else D2 end if+ où \lstinline+c+ est une expression statique booléenne.
+
+Les opérateurs prédefinis sont l'inverseur (\lstinline+not+), le \emph{et} logique (\lstinline+&+ ou \lstinline+and+), le \emph{ou} logique (\lstinline+or+ ou~\lstinline{+}), le \emph{ou exclusif} (\lstinline+xor+ ou \lstinline+^+), \lstinline+nand+ et le multiplexeur 1 bit (\lstinline+mux+). Les constantes \lstinline+true+(ou \texttt{1}) et \lstinline+false+ (ou \texttt{0}) sont également disponibles.
+
+\subsubsection*{Nappes de fils}
+
+On peut déclarer une variable \lstinline+x+ (entrée ou sortie) comme étant une nappe de \lstinline+n+ fils avec la syntaxe \lstinline+x : [n]+. On peut alors accéder au iéme fil avec \lstinline+x[i]+ (les indices commencent à 0) ou extraire une sous nappe avec \lstinline+x[i1 .. i2]+. On peut aussi écrire \lstinline+x[i1..]+ (resp. \lstinline+x[..i2]+) comme raccourci de \lstinline+x[i1..n-1]+ (resp. \lstinline+x[0..i2]+) si le tableau est de taille \texttt{n}. Il est également utile de concaténer des nappes avec l'opérateur \lstinline+.+. 
+
+Voici par exemple un bloc qui décale sa sortie de 1 bit vers la gauche:
+\begin{lstlisting}
+shift_left(a:[4]) = (o:[4]) where
+  o = a[1..3] . 0;
+end where
+\end{lstlisting}
+
+
+\subsubsection*{Paramétricité}
+\label{ref:static}
+
+La taille d'un tableau est donné par une \emph{expression statique}, qui est soit une constant globale, soit un paramètre d'un bloc, soit un opérateur statique (\lstinline{+, -, *, /, ^, =, <=}) appliqué à deux expression statiques. Les constantes globales sont déclarées par:
+\begin{lstlisting}
+const n = 32
+\end{lstlisting}
+
+Les paramètres statiques d'un bloc sont donnés entre crochets après son nom. Combinés avec les blocs conditionnels et la récursion, ils permettent de créer des circuits décrits de façon récursive. Un autre élément utile est la valeur \lstinline+[]+, qui est une nappe de taille 0. On peut par exemple définir un additionneur $n$ bits à partir d'un \texttt{fulladder} et d'un additionneur $n-1$ bits:
+\begin{lstlisting}
+adder<n>(a:[n], b:[n], c_in) = (o:[n], c_out) where
+  if n = 0 then
+    o = [];
+    c_out = 0
+  else
+    (s_n1, c_n1) = adder<n-1>(a[1..], b[1..], c_in);
+    (s_n, c_out) = fulladder(a[0], b[0], c_n1);
+    o = s_n . s_n1
+  end if
+end where
+\end{lstlisting}
+
+
+\subsubsection*{Primitives mémoire}
+
+Il est possible de déclarer des blocs mémoire, ROM ou RAM, avec la syntaxe suivante:
+\begin{lstlisting}
+o1 = ram<addr_size, word_size>(read_addr, write_enable, write_addr, write_data);
+o2 = rom<addr_size, word_size>(read_addr);
+\end{lstlisting}
+\lstinline+word_size+ est la taille des mots mémoires, c'est-à-dire le nombre de bits lus à chaque cycle, qui est aussi la taille de la sortie. \lstinline+addr_size+ est la taille des adresses en mémoire, i.e. la mémoire contient $2^{\mathtt{addr\_size}}$ mots. Une ROM prend en entrée une adresse et renvoie le mot stocké à cette adresse. Une RAM fait le même chose mais prend aussi en entrée un bit indiquant s'il faut écrire (\texttt{write\_enable}), suivi de l'adresse et du mot à écrire. La RAM fonctionne comme un registre: on peut lire et écrire au même emplacement de la mémoire (i.e. \lstinline+read_addr = write_addr+ et \lstinline+write_enable = 1+) sans qu'il y ait de boucle combinatoire.  La valeur lue sera celle dans la mémoire à l'instant précédent.
+
+
+\subsection{Compilateur}
+
+%\subsubsection*{Compilation}
+%
+%Pour obtenir l'exécutable du compilateur, lancer dans le dossier \texttt{minijazz/}:
+%\begin{verbatim}
+%> ocamlbuild mjc.byte
+%\end{verbatim}
+%
+%
+%\subsubsection*{Exécution}
+
+Le compilateur \minijazz{} génère à partir d'un programme une net-list non ordonnée, ne contenant plus de blocs et dont chaque équation ne contient plus qu'une seule opération. Il faut spécifier le bloc principal du circuit avec l'option \texttt{-m} (par défaut, il s'appelle \texttt{main}).
+\begin{verbatim}
+> ./mjc.byte -m mon_bloc mon_fichier.mj
+\end{verbatim}
+Le fichier généré est un simple fichier texte décrivant une \emph{net-list}, avec l'extension \texttt{.net}, dont le contenu est décrit dans la partie suivante. 
+
+\section{Le langage de \emph{net-list}}
+
+\subsection{Syntaxe concrète}
+
+Une \emph{net-list} a la forme suivante:
+\begin{lstlisting}[language=nl]
+INPUT inputs
+OUTPUT outputs
+VAR vars IN
+  D
+\end{lstlisting}
+\texttt{inputs} et \texttt{outputs} sont les entrées et sorties du circuit, sous forme d'une liste d'identifiants. \texttt{vars} donne le type des entrées, sorties et variables locales (avec la même syntaxe que pour \minijazz{}). Enfin, \emph{D} représente la liste des portes du circuit. Chaque équation ne contient plus qu'une seule opération élémentaire, soit une opération booléenne (\texttt{OR}, \texttt{XOR}, \texttt{AND}, \texttt{NAND}), soit définir un registre (\texttt{REG}) ou une mémoire (\texttt{RAM}, \texttt{ROM}), soit une opération sur des nappes de fils (\texttt{SELECT}, \texttt{SLICE}, \texttt{CONCAT}). Voici par exemple la \emph{net-list} générée par le compilateur pour le circuit \texttt{Fulladder}:
+\begin{lstlisting}
+INPUT a, b, c
+OUTPUT s, r
+VAR
+  _l_1, _l_3, _l_4, _l_5, a, b, c, r, s
+IN
+r = OR _l_3 _l_5
+s = XOR _l_1 c
+_l_1 = XOR a b
+_l_3 = AND a b
+_l_4 = XOR a b
+_l_5 = AND _l_4 c
+\end{lstlisting}
+
+\subsection{Syntaxe abstraite}
+
+La syntaxe abstraite du langage de \emph{net-list}, c'est-à-dire l'ensemble des types représentant un circuit, est donné dans le fichier \texttt{netlist\_ast.ml}. Un analyseur lexical (\texttt{netlist\_lexer.mll}) et un analyseur syntaxique (\texttt{netlist\_parser.mly}) permettent de traduire un fichier texte dans la syntaxe concrète en la structure de données correspondante. On utilisera pour cela directement la fonction suivante définie dans le fichier \texttt{Netlist.ml}, qui attend un nom de fichier et renvoie le circuit correspondant:
+\begin{lstlisting}[language={[objective]caml}]
+val read_file : string -> Netlist_ast.program
+\end{lstlisting}
+
+Pour faire l'opération inverse, on utilisera la fonction suivante, définie dans \texttt{netlist\_printer.ml}:
+\begin{lstlisting}[language={[objective]caml}, xrightmargin=0.5cm]
+val print_program : out_channel -> Netlist_ast.program -> unit
+\end{lstlisting}
+
+\end{document}
