@@ -137,7 +137,7 @@ _exp:
   | e1=exp NAND e2=exp { Ecall ("nand", [], [e1; e2]) }
   | NOT a=exp     { Ecall ("not", [], [a])}
   | e1=exp DOT e2=exp
-    { Ecall("concat", [fresh_param(); fresh_param()], [e1; e2]) }
+    { Ecall("concat", [fresh_param(); fresh_param(); fresh_param ()], [e1; e2]) }
   | e1=simple_exp LBRACKET idx=static_exp RBRACKET
     { Ecall ("select", [idx; fresh_param()], [e1]) }
   | e1=simple_exp LBRACKET low=static_exp DOTDOT high=static_exp RBRACKET

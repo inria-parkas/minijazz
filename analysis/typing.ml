@@ -67,9 +67,11 @@ module Modules = struct
     add_sig ~params:["i"; "n"]
       ~constr:[constr1; constr2]
       "select" [TBitArray (mk_static_var "n")] [TBit];
-    add_sig ~params:["n1"; "n2"]
+    let add = mk_static_exp (SBinOp(SAdd, mk_static_var "n1", mk_static_var "n2")) in
+    add_sig ~params:["n1"; "n2"; "n3"]
+      ~constr:[mk_static_exp (SBinOp (SEqual, mk_static_var "n3", add))]
       "concat" [TBitArray (mk_static_var "n1"); TBitArray (mk_static_var "n2")]
-      [TBitArray (mk_static_exp (SBinOp(SAdd, mk_static_var "n1", mk_static_var "n2")))];
+      [TBitArray (mk_static_var "n3")];
     (* slice :  size = min <= max ? max - min + 1 : 0 *)
     let size =
       mk_static_exp
@@ -338,7 +340,7 @@ let rec type_block env b = match b with
       BIf(se, trueb, falseb)
 
 let ty_repr_block env b =
-  let static_exp funs acc se = subst env se, acc in
+  let static_exp funs acc se = simplify env se, acc in
   let ty funs acc ty =
     let ty = ty_repr ty in
     (* go through types to substitute static exps *)
