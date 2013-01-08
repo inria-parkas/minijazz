@@ -1,5 +1,6 @@
 open Ast
 open Static
+open Static_utils
 open Printer
 open Errors
 open Misc
@@ -222,26 +223,27 @@ let rec simplify_constr cl = match cl with
         | SBool false -> error (Static_constraint_false c)
         | _ -> c::(simplify_constr cl)
 
+let rec find_simplification_one c = match c.se_desc with
+  | SBinOp(SEqual, { se_desc = SVar s }, se)
+  | SBinOp(SEqual, se, { se_desc = SVar s }) ->
+      Some (s, se)
+  | SIf(_, se1, { se_desc = SBool true })
+  | SIf(_, { se_desc = SBool true }, se1) ->
+      find_simplification_one se1
+  | _ -> None
+
+let rec find_simplification params cl = match cl with
+  | [] -> None, []
+  | c::cl ->
+      (match find_simplification_one c with
+        | Some (s, se) when not (List.mem s params) ->
+            Some (s, se), cl
+        | _ ->
+            let res, cl = find_simplification params cl in
+            res, c::cl)
+
 let solve_constr params cl =
   let params = List.map (fun p -> p.p_name) params in
-  let rec find_simplification cl = match cl with
-    | [] -> None, []
-    | { se_desc = (SBinOp(SEqual, { se_desc = SVar s }, se)
-      | SBinOp(SEqual, se, { se_desc = SVar s })
-      | SIf(_, { se_desc = SBinOp(SEqual, { se_desc = SVar s }, se) },
-           { se_desc = SBool true })
-      | SIf(_, { se_desc = SBinOp(SEqual, se, { se_desc = SVar s }) },
-           { se_desc = SBool true })
-      | SIf(_, { se_desc = SBool true },
-           { se_desc = SBinOp(SEqual, { se_desc  = SVar s }, se) })
-      | SIf(_, { se_desc = SBool true },
-           { se_desc = SBinOp(SEqual, se, { se_desc = SVar s }) }) ) }::cl
-        when not (List.mem s params) ->
-        Some (s, se), cl
-    | c::cl ->
-      let res, cl = find_simplification cl in
-      res, c::cl
-  in
   let subst_and_error env c =
     let c' = subst env c in
     match c'.se_desc with
@@ -250,7 +252,7 @@ let solve_constr params cl =
   in
   let env = ref NameEnv.empty in
   let rec solve_one cl =
-    let res, cl = find_simplification cl in
+    let res, cl = find_simplification params cl in
     match res with
       | None -> cl
       | Some (s, se) ->

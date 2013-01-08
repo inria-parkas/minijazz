@@ -1,5 +1,6 @@
 open Ast
 open Static
+open Static_utils
 open Ident
 
 let expect_int se =

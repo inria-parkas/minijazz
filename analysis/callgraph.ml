@@ -1,6 +1,7 @@
 open Ast
 open Mapfold
 open Static
+open Static_utils
 open Location
 open Errors
 

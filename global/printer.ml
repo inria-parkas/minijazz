@@ -45,7 +45,7 @@ let rec print_static_exp ff se = match se.se_desc with
       fprintf ff "(%a %s %a)" print_static_exp se1  op_str  print_static_exp se2
   | SIf (c, se1, se2) ->
       fprintf ff "(%a ? %a : %a)"
-        print_static_exp c  print_static_exp se1  print_static_exp se1
+        print_static_exp c  print_static_exp se1  print_static_exp se2
 
 let rec print_static_type ff sty = match sty with
   | STInt -> fprintf ff "int"
