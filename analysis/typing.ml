@@ -275,10 +275,14 @@ let rec type_exp env e =
           let e = expect_exp env e TBit in
           Ereg e, TBit
       | Emem (MRom, addr_size, word_size, file, args) ->
+          (* addr_size > 0 *)
+          add_constraint (mk_static_exp (SBinOp (SLess, mk_static_int 0, addr_size)));
           let read_addr = assert_1 args in
           let read_addr = expect_exp env read_addr (TBitArray addr_size) in
           Emem (MRom, addr_size, word_size, file, [read_addr]), TBitArray word_size
       | Emem (MRam, addr_size, word_size, file, args) ->
+          (* addr_size > 0 *)
+          add_constraint (mk_static_exp (SBinOp (SLess, mk_static_int 0, addr_size)));
           let read_addr, write_en, write_addr, data_in = assert_4 args in
           let read_addr = expect_exp env read_addr (TBitArray addr_size) in
           let write_addr = expect_exp env write_addr (TBitArray addr_size) in
