@@ -1,26 +1,29 @@
 %{
  open Netlist_ast
 
- let value_of_int n =
-   let rec aux n =
-     let b =
-       match n mod 10 with
-         | 0 -> false
-         | 1 -> true
-         | i -> Format.eprintf "Unexpected: %d@." i; raise Parsing.Parse_error
-     in
-     if n < 10 then
-       [b]
-     else
-       b::(aux (n / 10))
-   in
-   match aux n with
-     | [] -> Format.eprintf "Empty list@."; raise Parsing.Parse_error
-     | [b] -> VBit b
-     | bl -> VBitArray (Array.of_list (List.rev bl))
+ let bool_of_string s = match s with
+  | "t" | "1" -> true
+  | "f" | "0" -> false
+  | _ -> raise Parsing.Parse_error
+
+ let bool_array_of_string s =
+   let a = Array.make (String.length s) false in
+   for i = 0 to String.length s - 1 do
+     a.(i) <- bool_of_string (String.sub s i 1)
+   done;
+   a
+
+ let value_of_const s =
+   let n = String.length s in
+   if n = 0 then
+     raise Parsing.Parse_error
+   else if n = 1 then
+     VBit (bool_of_string s)
+   else
+     VBitArray (bool_array_of_string s)
 %}
 
-%token <int> INT
+%token <string> CONST
 %token <string> NAME
 %token AND MUX NAND OR RAM ROM XOR REG NOT
 %token CONCAT SELECT SLICE
@@ -49,22 +52,25 @@ exp:
   | NAND x=arg y=arg { Ebinop(Nand, x, y) }
   | XOR x=arg y=arg { Ebinop(Xor, x, y) }
   | MUX x=arg y=arg z=arg { Emux(x, y, z) }
-  | ROM addr=INT word=INT ra=arg
+  | ROM addr=int word=int ra=arg
     { Erom(addr, word, ra) }
-  | RAM addr=INT word=INT ra=arg we=arg wa=arg data=arg
+  | RAM addr=int word=int ra=arg we=arg wa=arg data=arg
     { Eram(addr, word, ra, we, wa, data) }
   | CONCAT x=arg y=arg
      { Econcat(x, y) }
-  | SELECT idx=INT x=arg
+  | SELECT idx=int x=arg
      { Eselect (idx, x) }
-  | SLICE min=INT max=INT x=arg
+  | SLICE min=int max=int x=arg
      { Eslice (min, max, x) }
 
 arg:
-  | n=INT { Aconst (value_of_int n) }
+  | n=CONST { Aconst (value_of_const n) }
   | id=NAME { Avar id }
 
 var: x=NAME ty=ty_exp { (x, ty) }
 ty_exp:
   | /*empty*/ { TBit }
-  | COLON n=INT { TBitArray n }
+  | COLON n=int { TBitArray n }
+
+int:
+  | c=CONST { int_of_string c }
