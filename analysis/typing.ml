@@ -262,6 +262,7 @@ let solve_constr params cl =
   in
   let cl = simplify_constr cl in
   let cl = solve_one cl in
+  let cl = simplify_constr cl in
   cl, !env
 
 (* Typing of expressions *)
