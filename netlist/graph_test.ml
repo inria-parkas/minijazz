@@ -1,4 +1,4 @@
-open Igraph
+open Graph
 
 let rec check l = match l with
   | [] | [_] -> true
