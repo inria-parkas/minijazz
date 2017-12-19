@@ -84,6 +84,11 @@ let char_for_decimal_code lexbuf i =
           (int_of_char(Lexing.lexeme_char lexbuf (i+2)) - 48) in
   char_of_int(c land 0xFF)
 
+let size_of_base c =
+  match c with
+  | 'X' | 'x' -> 4
+  | 'O' | 'o' -> 3
+  | _ -> 1
 }
 
 let newline = '\n' | '\r' '\n'
@@ -118,10 +123,11 @@ rule token = parse
         with Not_found -> NAME id }
   | '0' ['b' 'B'] (['0'-'1']+ as lit)
       { BOOL_INT lit }
-  | ['0'-'9']+
-  | '0' ['x' 'X'] ['0'-'9' 'A'-'F' 'a'-'f']+
-  | '0' ['o' 'O'] ['0'-'7']+
-      { INT (int_of_string(Lexing.lexeme lexbuf)) }
+  | (['0'-'9']+ as lit)
+  | '0' (['x' 'X'] as base) (['0'-'9' 'A'-'F' 'a'-'f']+ as lit)
+  | '0' (['o' 'O'] as base) (['0'-'7']+ as lit)
+      { let b = match base with None -> 1 | Some b -> size_of_base b in
+        INT (String.length lit * b, int_of_string(Lexing.lexeme lexbuf)) }
   | "\""
       { reset_string_buffer();
         let string_start = lexbuf.lex_start_p in

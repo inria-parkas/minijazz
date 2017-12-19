@@ -88,6 +88,9 @@ let bool_array_of_string s =
   done;
   a
 
+let bool_array_of_int nbits v =
+  Array.init nbits (fun n -> v land (1 lsl (nbits - 1 - n)) <> 0)
+
 exception Int_too_big
 let convert_size s n =
   let m = String.length s in

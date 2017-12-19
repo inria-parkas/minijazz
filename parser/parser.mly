@@ -17,7 +17,7 @@ let fresh_param () =
 %token IF THEN ELSE LEQ DOT DOTDOT
 %token <string> NAME
 %token <string> STRING
-%token <int> INT
+%token <int * int> INT
 %token <string> BOOL_INT
 %token <bool> BOOL
 
@@ -108,7 +108,7 @@ pat:
 
 static_exp: se=_static_exp { mk_static_exp ~loc:(Loc ($startpos,$endpos)) se }
 _static_exp :
-  | i=INT { SInt i }
+  | i=INT { SInt (snd i) }
   | n=NAME { SVar n }
   | LPAREN se=_static_exp RPAREN { se }
   /*integer ops*/
@@ -164,11 +164,7 @@ const:
   | b=BOOL { VBit b }
   | b=BOOL_INT { VBitArray (bool_array_of_string b) }
   | i=INT
-    { match i with
-      | 0 -> VBit false
-      | 1 -> VBit true
-      | _ -> raise Parsing.Parse_error
-    }
+    { let (s, v) = i in VBitArray (bool_array_of_int s v) }
   | LBRACKET RBRACKET { VBitArray (Array.make 0 false) }
 
 rom_or_ram :
