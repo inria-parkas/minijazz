@@ -1,5 +1,5 @@
 (* version of the compiler *)
-let version = "0.2.1"
+let version = "0.2.2"
 
 let verbose = ref false
 let print_types = ref false
