@@ -33,4 +33,5 @@ let df = function
 
   | _ -> ()
 
+let _ = mark_tag_used "pkg_ocamlgraph"
 let _ = dispatch df

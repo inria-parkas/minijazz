@@ -124,10 +124,7 @@ let convert_size s n =
     if m = n then s else (String.make (n - m) '0')^s
 
 let binary_not s =
-  for i=0 to String.length s - 1 do
-    s.[i] <- if s.[i] = '0' then '1' else '0'
-  done;
-  s
+  String.map (fun c -> if c = '0' then '1' else '0') s
 
 let rec binary_string_of_int i n =
   let rec s_of_i i = match i with
