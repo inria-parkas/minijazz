@@ -1,0 +1,14 @@
+B _build/analysis
+B _build/global
+B _build/main
+B _build/netlist
+B _build/parser
+
+S analysis
+S global
+S main
+S netlist
+S parser
+
+PKG menhir
+
