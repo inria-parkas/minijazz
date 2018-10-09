@@ -118,7 +118,16 @@ let check_names p =
   in
   { p with p_nodes = List.map node p.p_nodes }
 
+let warn_duplicate_node_names { p_nodes } =
+  let check defd n =
+    if NameSet.mem n.n_name defd then
+      Format.eprintf "%aDuplicate node name: %s@."
+        print_location n.n_loc n.n_name;
+    NameSet.add n.n_name defd
+  in
+  ignore ( List.fold_left check NameSet.empty p_nodes)
 
 let program p =
   let p = simplify_program p in
+  warn_duplicate_node_names p;
   check_names p
