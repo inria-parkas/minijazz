@@ -24,7 +24,7 @@
 (***********************************************************************)
 
 (* version of the compiler *)
-let version = "0.2.2"
+let version = "0.3.0"
 
 let verbose = ref false
 let print_types = ref false
