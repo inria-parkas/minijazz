@@ -81,6 +81,7 @@ module Modules = struct
 
   let _ =
     add_sig "and" [TBit;TBit] [TBit];
+    add_sig "nand" [TBit;TBit] [TBit];
     add_sig "xor" [TBit;TBit] [TBit];
     add_sig "or"  [TBit;TBit] [TBit];
     add_sig "not" [TBit] [TBit];
